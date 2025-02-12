@@ -1,0 +1,109 @@
+site_name: Octopolars
+site_author: Louis Maddox
+site_description: >-
+  Pull, filter, walk, and read a GitHub user's repositories with Polars.
+site_url: https://polars-filter-hopper.vercel.app
+repo_name: lmmx/polars-filter-hopper
+repo_url: https://github.com/lmmx/polars-filter-hopper
+strict: true
+watch: [src]
+
+extra_css:
+  - stylesheets/extra.css
+
+theme:
+  name: material
+  custom_dir: docs/theme
+  palette:
+    - scheme: default
+      primary: white
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - announce.dismiss
+    - content.tabs.link
+    - content.code.annotate
+    - content.code.copy
+    - header.autohide
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.prune
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - search
+    - search.suggest
+  font:
+    text: Inter
+    code: Source Code Pro
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/lmmx
+  generator: false
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.blocks.definition
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+      noclasses: true
+      pygments_style: lovelace
+  - pymdownx.inlinehilite
+  - pymdownx.magiclink:
+      repo_url_shortener: true
+      normalize_issue_symbols: true
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - sane_lists
+  - toc:
+      permalink: true
+
+plugins:
+  - autorefs
+  - extra-sass
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [src/*/]
+          options:
+            members_order: source
+            separate_signature: true
+            filters: ["!^_"]
+            docstring_options:
+              ignore_init_summary: true
+            merge_init_into_class: true
+            line_length: 88
+            show_root_full_path: false
+            show_root_toc_entry: false
+            show_source: true
+            show_submodules: true
+            show_signature_annotations: true
+  - search
+  - section-index
+  - social:
+      cards_layout_options:
+        color: "#de0"
+
+nav:
+  - Home: index.md
+  - Getting Started: get_started.md
+  # - Changelog: changelog.md
+  - API Reference:
+      - api/index.md
+      - "cli": api/cli.md
+      - "inventory": api/inventory.md

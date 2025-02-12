@@ -1,0 +1,75 @@
+[build-system]
+build-backend = "pdm.backend"
+requires = [
+  "pdm-backend"
+]
+
+[project]
+name = "polars-filter-hopper"
+version = "0.1.0"
+description = "A Polars plugin providing a 'hopper' of filters for automatic, schema-aware application."
+readme = "README.md"
+requires-python = ">=3.9"
+keywords = [
+  "polars",
+  "plugin",
+  "filter",
+  "metadata"
+]
+license = {text = "MIT"}
+authors = [
+  {name = "Louis Maddox", email = "louismmx@gmail.com"}
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13"
+]
+dependencies = [
+  "polars-config-meta>=0.1.3"
+]
+
+[project.optional-dependencies]
+polars = [
+  "polars>=1.21.0"
+]
+polars-lts-cpu = [
+  "polars-lts-cpu>=1.21.0"
+]
+dev = [
+  "pdm>=2.22.3",
+  "pdm-bump>=0.9.10",
+  "pre-commit>=4.1.0",
+  "pytest>=8.3.4"
+]
+pyarrow = [
+  "polars-config-meta[pyarrow]>=0.1.3"
+]
+
+[project.urls]
+Documentation = "https://polars-filter-hopper.vercel.app/"
+Homepage = "https://github.com/lmmx/polars-filter-hopper"
+Repository = "https://github.com/lmmx/polars-filter-hopper.git"
+
+[tool.ruff]
+
+[tool.ruff.lint]
+ignore = ["C408", "C901", "E501", "E722", "E741"]
+select = ["C", "D", "E", "F", "I", "UP", "W"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["polars_hopper"]
+lines-after-imports = 2
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E401", "F401"]

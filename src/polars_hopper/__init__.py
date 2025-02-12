@@ -1,9 +1,9 @@
-"""Polars hopper plugin.
+"""Polars hopper plugin with both filter and select 'queues'.
 
 Register a ".hopper" namespace on Polars DataFrame objects for managing
-a 'hopper' of Polars expressions (e.g. filters). The expressions are stored as
-metadata in `df.config_meta` (provided by polars-config-meta). They apply
-themselves when the necessary columns exist, removing themselves once used.
+a 'hopper' of Polars expressions (e.g. filters, selects). The expressions are
+stored as metadata in `df.config_meta`. They apply themselves when the
+necessary columns exist, removing themselves once used.
 """
 
 import io
@@ -16,26 +16,35 @@ from polars.api import register_dataframe_namespace
 
 @register_dataframe_namespace("hopper")
 class HopperPlugin:
-    """Hopper plugin for storing and applying Polars filter expressions.
+    """Hopper plugin for storing and applying Polars filter/select expressions.
 
-    By calling `df.hopper.add_filters(*expr)`, you add Polars expressions
-    (pl.Expr). Each expression is applied as `df.filter(expr)` if the
-    required columns exist. Successfully applied filters are removed
-    from both the old and new DataFrame objects.
+    By calling `df.hopper.add_filters(*exprs)`, you add Polars expressions
+    that should evaluate to a boolean mask (for filtering).
+    By calling `df.hopper.add_selects(*exprs)`, you add Polars expressions
+    that transform or select columns when calling `df.select(expr)`.
     """
 
     def __init__(self, df: pl.DataFrame):
-        """Ensure a 'hopper_filters' key in metadata if not present."""
+        """Ensure required metadata keys exist if not present."""
         self._df = df
         meta = df.config_meta.get_metadata()
+
         if "hopper_filters" not in meta:
             meta["hopper_filters"] = []
-            df.config_meta.set(**meta)
+        if "hopper_selects" not in meta:
+            meta["hopper_selects"] = []
 
+        df.config_meta.set(**meta)
+
+    # -------------------------------------------------------------------------
+    # Filter storage and application
+    # -------------------------------------------------------------------------
     def add_filters(self, *exprs: pl.Expr) -> None:
-        """Add a Polars expression to the hopper.
+        """Add one or more Polars filter expressions to the hopper.
 
-        This expression should evaluate to a boolean mask when used in `df.filter(expr)`.
+        Each expression is typically used in `df.filter(expr)`, returning
+        a boolean mask. They remain in the queue until the columns they need
+        are present, at which point they are applied (and removed).
         """
         meta = self._df.config_meta.get_metadata()
         filters = meta.get("hopper_filters", [])
@@ -44,20 +53,19 @@ class HopperPlugin:
         self._df.config_meta.set(**meta)
 
     def list_filters(self) -> list[pl.Expr]:
-        """Return the list of pending Polars expressions."""
+        """Return the list of pending Polars filter expressions."""
         return self._df.config_meta.get_metadata().get("hopper_filters", [])
 
     def apply_ready_filters(self) -> pl.DataFrame:
-        """Apply any stored expressions if the referenced columns exist.
+        """Apply any stored filter expressions if referenced columns exist.
 
-        Each expression is tried in turn with `df.filter(expr)`. If a KeyError
-        or similar occurs (missing columns), the expression remains pending.
+        Each expression is tried in turn with `df.filter(expr)`. If missing
+        columns, that expression remains pending for later.
 
         Returns
         -------
         A new (possibly filtered) DataFrame. If it differs from self._df,
         polars-config-meta merges metadata automatically.
-
         """
         meta_pre = self._df.config_meta.get_metadata()
         current_exprs = meta_pre.get("hopper_filters", [])
@@ -70,8 +78,11 @@ class HopperPlugin:
         for expr in current_exprs:
             needed_cols = set(expr.meta.root_names())
             if needed_cols <= avail_cols:
+                # All needed columns exist; apply the filter
                 filtered_df = filtered_df.filter(expr)
                 applied_any = True
+                # Update available columns if needed
+                avail_cols = set(filtered_df.columns)
             else:
                 # Missing column => keep the expression for later
                 still_pending.append(expr)
@@ -88,10 +99,71 @@ class HopperPlugin:
 
         return filtered_df
 
-    # ------------------------------------------------------------
-    # Optional: "Auto-serialisation" on write_parquet
-    # ------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Select storage and application
+    # -------------------------------------------------------------------------
+    def add_selects(self, *exprs: pl.Expr) -> None:
+        """Add one or more Polars select expressions to the hopper.
 
+        These expressions are used in `df.select(expr)`. Each expression
+        typically yields a column transformation, or just a column reference
+        (like `pl.col("foo").alias("bar")`).
+        """
+        meta = self._df.config_meta.get_metadata()
+        selects = meta.get("hopper_selects", [])
+        selects.extend(exprs)
+        meta["hopper_selects"] = selects
+        self._df.config_meta.set(**meta)
+
+    def list_selects(self) -> list[pl.Expr]:
+        """Return the list of pending Polars select expressions."""
+        return self._df.config_meta.get_metadata().get("hopper_selects", [])
+
+    def apply_ready_selects(self) -> pl.DataFrame:
+        """Apply any stored select expressions if columns exist.
+
+        We attempt each select expression in turn. Because `df.select(expr)`
+        replaces the DataFrame columns entirely, you should be aware that
+        subsequent select expressions apply to the new shape of the DataFrame.
+
+        If any required columns are missing, that expression remains pending.
+
+        Returns
+        -------
+        A new DataFrame with the successfully selected/transformed columns.
+        """
+        meta_pre = self._df.config_meta.get_metadata()
+        current_exprs = meta_pre.get("hopper_selects", [])
+        still_pending = []
+        selected_df = self._df
+        applied_any = False
+
+        for expr in current_exprs:
+            needed_cols = set(expr.meta.root_names())
+            avail_cols = set(selected_df.columns)
+            if needed_cols <= avail_cols:
+                # We can apply this select
+                selected_df = selected_df.select(expr)
+                applied_any = True
+            else:
+                # Missing columns => keep in the queue
+                still_pending.append(expr)
+
+        # Update old DF's metadata
+        meta_pre["hopper_selects"] = still_pending
+        self._df.config_meta.set(**meta_pre)
+
+        # If a new DataFrame was produced, update its metadata as well
+        if applied_any and id(selected_df) != id(self._df):
+            meta_post = selected_df.config_meta.get_metadata()
+            meta_post["hopper_selects"] = still_pending
+            selected_df.config_meta.set(**meta_post)
+
+        return selected_df
+
+    # -------------------------------------------------------------------------
+    # Serialization override when writing parquet
+    # -------------------------------------------------------------------------
     def _write_parquet_plugin(
         self,
         file: str,
@@ -102,26 +174,27 @@ class HopperPlugin:
         """Intercept df.config_meta.write_parquet(...).
 
         Steps:
-          1. Convert in-memory pl.Expr to a safe storable format (json/binary).
-          2. Remove the original pl.Expr objects from 'hopper_filters'.
+          1. Convert in-memory pl.Expr (both filters and selects)
+             to a safe storable format (json/binary).
+          2. Remove the original pl.Expr objects from their queues.
           3. Call the real config_meta write_parquet.
           4. Restore the original in-memory expressions after writing.
-
-        By default, we use "json" for easier storage in metadata,
-        but "binary" is also valid if you handle it carefully.
         """
         meta = self._df.config_meta.get_metadata()
-        exprs = meta.get("hopper_filters", [])
 
-        # 1) Convert each expression to the chosen format
-        serialised_data = []
-        for expr in exprs:
-            data = expr.meta.serialize(format=format)
-            serialised_data.append(data)
+        # 1) Convert each filter expression
+        exprs_filters = meta.get("hopper_filters", [])
+        serialized_filters = [expr.meta.serialize(format=format) for expr in exprs_filters]
 
-        # 2) Store them in a side key, remove original expr objects
-        meta["hopper_filters_serialised"] = (serialised_data, format)
+        # 1b) Convert each select expression
+        exprs_selects = meta.get("hopper_selects", [])
+        serialized_selects = [expr.meta.serialize(format=format) for expr in exprs_selects]
+
+        # 2) Store them in side keys, remove original expression objects
+        meta["hopper_filters_serialised"] = (serialized_filters, format)
         meta["hopper_filters"] = []
+        meta["hopper_selects_serialised"] = (serialized_selects, format)
+        meta["hopper_selects"] = []
         self._df.config_meta.set(**meta)
 
         # 3) Actually write parquet using polars_config_meta's fallback
@@ -131,28 +204,38 @@ class HopperPlugin:
         original_write_parquet(file, **kwargs)
 
         # 4) Restore the original in-memory expressions
-        #    so the user session stays consistent
-        #    We'll do the reverse of what we'd do after reading
-        restored_exprs = []
-        ser_data, ser_fmt = self._df.config_meta.get_metadata()[
-            "hopper_filters_serialised"
-        ]
-        for item in ser_data:
-            if ser_fmt == "json":
-                expr = pl.Expr.deserialize(io.StringIO(item), format="json")
-            else:  # "binary"
-                expr = pl.Expr.deserialize(io.BytesIO(item), format="binary")
-            restored_exprs.append(expr)
+        meta_after = self._df.config_meta.get_metadata()
+        f_ser_data, f_ser_fmt = meta_after["hopper_filters_serialised"]
+        s_ser_data, s_ser_fmt = meta_after["hopper_selects_serialised"]
 
-        meta_restored = self._df.config_meta.get_metadata()
-        meta_restored["hopper_filters"] = restored_exprs
-        del meta_restored["hopper_filters_serialised"]
-        self._df.config_meta.set(**meta_restored)
+        restored_filters = []
+        for item in f_ser_data:
+            if f_ser_fmt == "json":
+                restored_filters.append(pl.Expr.deserialize(io.StringIO(item), format="json"))
+            else:  # "binary"
+                restored_filters.append(pl.Expr.deserialize(io.BytesIO(item), format="binary"))
+
+        restored_selects = []
+        for item in s_ser_data:
+            if s_ser_fmt == "json":
+                restored_selects.append(pl.Expr.deserialize(io.StringIO(item), format="json"))
+            else:  # "binary"
+                restored_selects.append(pl.Expr.deserialize(io.BytesIO(item), format="binary"))
+
+        meta_after["hopper_filters"] = restored_filters
+        meta_after["hopper_selects"] = restored_selects
+
+        # Cleanup
+        del meta_after["hopper_filters_serialised"]
+        del meta_after["hopper_selects_serialised"]
+
+        self._df.config_meta.set(**meta_after)
 
     def __getattr__(self, name: str):
-        """Fallback for calls like df.hopper.select(...).
+        """Fallback for calls like df.hopper.select(...), etc.
 
         Intercept 'write_parquet' calls for auto-serialisation.
+        Otherwise, just pass through to df.config_meta or df itself.
         """
         if name == "write_parquet":
             return self._write_parquet_plugin

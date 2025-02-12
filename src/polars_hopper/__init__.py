@@ -10,7 +10,7 @@ import io
 from typing import Literal, Union
 
 import polars as pl
-import polars_config_meta
+import polars_config_meta  # noqa: F401
 from polars.api import register_dataframe_namespace
 
 
@@ -18,7 +18,7 @@ from polars.api import register_dataframe_namespace
 class HopperPlugin:
     """Hopper plugin for storing and applying Polars filter expressions.
 
-    By calling `df.hopper.add_filter(expr)`, you add Polars expressions
+    By calling `df.hopper.add_filters(*expr)`, you add Polars expressions
     (pl.Expr). Each expression is applied as `df.filter(expr)` if the
     required columns exist. Successfully applied filters are removed
     from both the old and new DataFrame objects.
@@ -32,14 +32,14 @@ class HopperPlugin:
             meta["hopper_filters"] = []
             df.config_meta.set(**meta)
 
-    def add_filter(self, expr: pl.Expr) -> None:
+    def add_filters(self, *exprs: pl.Expr) -> None:
         """Add a Polars expression to the hopper.
 
         This expression should evaluate to a boolean mask when used in `df.filter(expr)`.
         """
         meta = self._df.config_meta.get_metadata()
         filters = meta.get("hopper_filters", [])
-        filters.append(expr)
+        filters.extend(exprs)
         meta["hopper_filters"] = filters
         self._df.config_meta.set(**meta)
 

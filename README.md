@@ -59,8 +59,8 @@ df = pl.DataFrame({
 # Add expressions to the hopper:
 #  - This one is valid right away: pl.col("user_id") != 0
 #  - Another needs a future 'age' column
-df.hopper.add_filter(pl.col("user_id") != 0)
-df.hopper.add_filter(pl.col("age") > 18)  # 'age' doesn't exist yet
+df.hopper.add_filters(pl.col("user_id") != 0)
+df.hopper.add_filters(pl.col("age") > 18)  # 'age' doesn't exist yet
 
 # Apply what we can; the first expression is immediately valid:
 df = df.hopper.apply_ready_filters()
@@ -124,16 +124,16 @@ This idea **could be extended to `select` statements**, but initially filtering 
 
 ### API Methods
 
-- **`add_filter(predicate: Callable[[pl.DataFrame], pl.Series])`**
+- `add_filters(*exprs: tuple[pl.Expr, ...])`
   Add a new predicate (lambda, function, Polars expression, etc.) to the hopper.
 
-- **`apply_ready_filters() -> pl.DataFrame`**
+- `apply_ready_filters() -> pl.DataFrame`
   Check each stored expression’s root names. If the columns exist, `df.filter(expr)` is applied. Successfully applied expressions are removed.
-- **`list_filters() -> List[pl.Expr]`**
+- `list_filters() -> List[pl.Expr]`
   Inspect the still-pending expressions in the hopper.
-- **`serialise_filters(format="binary"|"json") -> List[str|bytes]`**
+- `serialise_filters(format="binary"|"json") -> List[str|bytes]`
   Convert expressions to JSON strings or binary bytes.
-- **`deserialise_filters(serialised_list, format="binary"|"json")`**
+- `deserialise_filters(serialised_list, format="binary"|"json")`
   Re-create in-memory `pl.Expr` objects from the serialised data, overwriting any existing expressions.
 
 ## Contributing

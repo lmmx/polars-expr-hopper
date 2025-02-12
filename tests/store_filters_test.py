@@ -10,7 +10,7 @@ def test_store_filters():
     meta = df.config_meta.get_metadata()
     assert meta.get("hopper_filters", []) == []
 
-    df.hopper.add_filter(pl.col("x") > 1)
+    df.hopper.add_filters(pl.col("x") > 1)
 
     meta_after = df.config_meta.get_metadata()
     stored = meta_after.get("hopper_filters", [])

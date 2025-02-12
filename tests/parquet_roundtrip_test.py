@@ -26,7 +26,7 @@ def test_parquet_roundtrip_json(tmp_path):
     Auto-converting exprs to JSON strings in 'hopper_filters_serialised'.
     """
     df = pl.DataFrame({"col": [5, 10, 15]})
-    df.hopper.add_filter(pl.col("col") > 5)
+    df.hopper.add_filters(pl.col("col") > 5)
 
     out_file = tmp_path / "test_filters.parquet"
     # This triggers the custom _write_parquet_plugin code

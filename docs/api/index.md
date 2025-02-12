@@ -10,7 +10,7 @@ applied as soon as their required columns appear.
 
 You’ll see method signatures, class methods, and parameters that let you:
 
-- Add expressions (e.g., `df.hopper.add_filter(pl.col("age") > 18)`)
+- Add expressions (e.g., `df.hopper.add_filters(pl.col("age") > 18)`)
 - Check which columns are missing and skip or apply expressions dynamically
 - Optionally serialize expressions to JSON/binary for Parquet round-trip (if needed)
 

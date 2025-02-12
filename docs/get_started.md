@@ -40,7 +40,7 @@ df = pl.DataFrame({
 })
 
 # Add an expression referencing 'user_id'
-df.hopper.add_filter(pl.col("user_id") != 0)
+df.hopper.add_filters(pl.col("user_id") != 0)
 
 # Apply what we can; 'user_id' is present, so the filter applies now
 df = df.hopper.apply_ready_filters()
@@ -48,7 +48,7 @@ print(df)
 # Rows with user_id=0 are dropped.
 
 # Add an expression referencing 'age' (not yet present)
-df.hopper.add_filter(pl.col("age") > 18)
+df.hopper.add_filters(pl.col("age") > 18)
 
 # Add the 'age' column
 df2 = df.hopper.with_columns(pl.Series("age", [25, 15, 30]))

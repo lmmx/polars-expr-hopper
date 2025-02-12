@@ -6,6 +6,8 @@ metadata in `df.config_meta` (provided by polars-config-meta). They apply
 themselves when the necessary columns exist, removing themselves once used.
 """
 
+from typing import Literal
+
 import polars as pl
 import polars_config_meta
 from polars.api import register_dataframe_namespace
@@ -82,6 +84,60 @@ class HopperPlugin:
             filtered_df.config_meta.set(**meta_post)
 
         return filtered_df
+
+    def serialize_filters(
+        self,
+        format: Literal["binary", "json"] = "binary",
+    ) -> list[str | bytes]:
+        """
+        Convert each stored pl.Expr into either binary (bytes) or JSON (str).
+
+        Parameters
+        ----------
+        format
+            "binary" (default) => returns a list of bytes
+            "json" => returns a list of strings
+
+        Returns
+        -------
+        A list of serialized data (bytes or strings) that can be stored externally.
+        """
+        exprs = self.list_filters()
+        serialized_list = []
+        for expr in exprs:
+            data = expr.meta.serialize(format=format)
+            # If 'binary' => data is bytes, if 'json' => data is a string
+            serialized_list.append(data)
+        return serialized_list
+
+    def deserialize_filters(
+        self,
+        serialized_list: list[str | bytes],
+        format: Literal["binary", "json"] = "binary",
+    ) -> None:
+        """
+        Replace existing filters with newly deserialized expressions.
+
+        Parameters
+        ----------
+        serialized_list
+            A list of data as returned by serialize_filters().
+        format
+            "binary" or "json" (default "binary") to match how they were serialized.
+        """
+        new_exprs = []
+        for item in serialized_list:
+            if format == "json":
+                # item is a string
+                expr = pl.Expr.deserialize(io.StringIO(item), format="json")
+            else:
+                # item is bytes
+                expr = pl.Expr.deserialize(io.BytesIO(item), format="binary")
+            new_exprs.append(expr)
+
+        meta = self._df.config_meta.get_metadata()
+        meta["hopper_filters"] = new_exprs
+        self._df.config_meta.set(**meta)
 
     def __getattr__(self, name: str):
         """Fallback for calls like df.hopper.select(...).

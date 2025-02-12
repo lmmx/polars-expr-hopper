@@ -441,7 +441,7 @@ pyarrow = [
 ]
 
 [[package]]
-name = "polars-filter-hopper"
+name = "polars-expr-hopper"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

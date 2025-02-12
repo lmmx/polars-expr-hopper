@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/pypi/l/polars-expr-hopper.svg)](https://pypi.org/project/polars-expr-hopper)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/lmmx/polars-expr-hopper/master.svg)](https://results.pre-commit.ci/latest/github/lmmx/polars-expr-hopper/master)
 
-**Polars plugin providing a ‘expression hopper’**—a flexible, DataFrame-level container of expressions (predicates such as filter) that apply themselves **as soon as** the relevant columns are available.
+**Polars plugin providing an “expression hopper”**—a flexible, DataFrame-level container of **Polars expressions** (`pl.Expr`) that apply themselves **as soon as** the relevant columns are available.
 
 Powered by [polars-config-meta](https://pypi.org/project/polars-config-meta/) for persistent DataFrame-level metadata.
 
@@ -31,15 +31,16 @@ pip install polars-expr-hopper
 
 - Python 3.9+
 - Polars (any recent version, installed via `[polars]` or `[polars-lts-cpu]` extras)
-- _(Optional)_ [pyarrow](https://pypi.org/project/pyarrow) if you want Parquet I/O features that preserve the hopper metadata
+- _(Optional)_ [pyarrow](https://pypi.org/project/pyarrow) if you want Parquet I/O features that preserve metadata in the hopper
 
 ## Features
 
-- **DataFrame-Level Filter Management**: Store multiple predicate functions on a DataFrame via the `.hopper` namespace.
+- **DataFrame-Level Expression Management**: Store multiple Polars **expressions** on a DataFrame via the `.hopper` namespace.
 - **Apply When Ready**: Each expression is automatically applied once the DataFrame has all columns required by that expression.
 - **Namespace Plugin**: Access everything through `df.hopper.*(...)`—no subclassing or monkey-patching.
 - **Metadata Preservation**: Transformations called through `df.hopper.<method>()` keep the same expression hopper on the new DataFrame.
 - **No Central Orchestration**: Avoid fiddly pipeline step names or schemas—just attach your expressions once, and they get applied in the right order automatically.
+- **Optional Serialisation**: If you want to store or share expressions across runs (e.g., Parquet round-trip), you can serialise them to JSON or binary and restore them later—without forcing overhead in normal usage.
 
 ## Usage
 
@@ -56,12 +57,12 @@ df = pl.DataFrame({
 })
 
 # Add expressions to the hopper:
-#  - This one needs 'user_id' (which exists now).
-#  - We'll also add one needing a future 'age' column.
+#  - This one is valid right away: pl.col("user_id") != 0
+#  - Another needs a future 'age' column
 df.hopper.add_filter(pl.col("user_id") != 0)
 df.hopper.add_filter(pl.col("age") > 18)  # 'age' doesn't exist yet
 
-# Apply what we can; the first filter is immediately valid:
+# Apply what we can; the first expression is immediately valid:
 df = df.hopper.apply_ready_filters()
 print(df)
 # Rows with user_id=0 are dropped.
@@ -73,23 +74,53 @@ df2 = df.hopper.with_columns(
     pl.Series("age", [25, 15, 30])  # new column
 )
 
-# Now the second filter can be applied:
+# Now the second expression can be applied:
 df2 = df2.hopper.apply_ready_filters()
 print(df2)
-# Only rows with age > 18 remain. That filter expression is then removed from the hopper.
+# Only rows with age > 18 remain. That expression is then removed from the hopper.
 ```
 
 ### How It Works
 
-Internally, **polars-expr-hopper** attaches a small “manager” object to your `DataFrame` (similar to how [polars-config-meta](https://pypi.org/project/polars-config-meta/) does). This manager:
+Below is a **combined** “How It Works” section that merges the key points from both previous versions, ensuring a cohesive explanation of the internal mechanism:
 
-- Keeps track of a list (or set) of expressions (callable predicates).
-- On `apply_ready_filters()`, checks each filter expression’s required columns.
-- Applies those filter expressions that are valid for the current schema.
-- Removes applied filter expressions from the “hopper.”
-- Copies the hopper forward when you call `df.hopper.select(...)`, `df.hopper.with_columns(...)`, etc.
+---
 
-Because we use Polars’ plugin system and store the metadata in a dictionary keyed by `id(df)`, the same patterns (weak references, no monkey-patching, etc.) described in **polars-config-meta** apply here as well.
+### How It Works
+
+Internally, **polars-expr-hopper** attaches a small “manager” object (a plugin namespace) to each `DataFrame`. This manager leverages [polars-config-meta](https://pypi.org/project/polars-config-meta/) to store data in `df.config_meta.get_metadata()`, keyed by the `id(df)`.
+
+1. **List of In-Memory Expressions**:
+   - Maintains a `hopper_filters` list of Polars expressions (`pl.Expr`) in the DataFrame’s metadata.
+   - Avoids Python callables or lambdas so that **.meta.root_names()** can be used for schema checks and optional serialisation is possible.
+
+2. **Automatic Column Check** (`apply_ready_filters()`)
+   - On `apply_ready_filters()`, each expression’s required columns (via `.meta.root_names()`) are compared to the current DataFrame schema.
+   - Expressions referencing missing columns remain pending.
+   - Expressions referencing all present columns are applied via `df.filter(expr)`.
+   - Successfully applied expressions are removed from the hopper.
+
+3. **Metadata Preservation**
+   - Because we rely on **polars-config-meta**, transformations called through `df.hopper.select(...)`, `df.hopper.with_columns(...)`, etc. automatically copy the same `hopper_filters` list to the new DataFrame.
+   - This ensures **pending** expressions remain valid throughout your pipeline until their columns finally appear.
+
+4. **No Monkey-Patching**
+   - Polars’ plugin system is used, so there is no monkey-patching of core Polars classes.
+   - The plugin registers a `.hopper` namespace—just like `df.config_meta`, but specialised for expression management.
+
+Together, these features allow you to:
+
+- store a **set** of Polars expressions in one place
+- apply them **as soon as** their required columns exist
+- easily carry them forward through the pipeline
+
+All without global orchestration or repeated expression checks.
+
+This was motivated by wanting a way to make a flexible CLI tool and express filters for the results
+at different steps, without a proliferation of CLI flags. From there, the idea of a 'queue' which
+was pulled from on demand, in FIFO order but on the condition that the schema must be amenable was born.
+
+This idea **could be extended to `select` statements**, but initially filtering was the primary deliverable.
 
 ### API Methods
 
@@ -97,12 +128,13 @@ Because we use Polars’ plugin system and store the metadata in a dictionary ke
   Add a new predicate (lambda, function, Polars expression, etc.) to the hopper.
 
 - **`apply_ready_filters() -> pl.DataFrame`**
-  Check all stored predicates for which columns they need. Apply every predicate that is *now* valid, returning a filtered DataFrame. Already-applied filters are removed from the hopper.
-
-- **`list_filters() -> List[Callable]`**
-  Return the still-pending filters in the hopper. Useful for debugging or inspection.
-
-- **Any existing Polars method** (like `with_columns`, `select`, `filter`, `groupby`, etc.) can be accessed via `df.hopper.with_columns(...)` or `df.hopper.filter(...)`. This ensures the new DataFrame is automatically registered with the plugin and the hopper data is copied forward.
+  Check each stored expression’s root names. If the columns exist, `df.filter(expr)` is applied. Successfully applied expressions are removed.
+- **`list_filters() -> List[pl.Expr]`**
+  Inspect the still-pending expressions in the hopper.
+- **`serialise_filters(format="binary"|"json") -> List[str|bytes]`**
+  Convert expressions to JSON strings or binary bytes.
+- **`deserialise_filters(serialised_list, format="binary"|"json")`**
+  Re-create in-memory `pl.Expr` objects from the serialised data, overwriting any existing expressions.
 
 ## Contributing
 

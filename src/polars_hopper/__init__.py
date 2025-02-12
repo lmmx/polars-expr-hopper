@@ -57,6 +57,7 @@ class HopperPlugin:
         -------
         A new (possibly filtered) DataFrame. If it differs from self._df,
         polars-config-meta merges metadata automatically.
+
         """
         meta_pre = self._df.config_meta.get_metadata()
         current_exprs = meta_pre.get("hopper_filters", [])
@@ -88,14 +89,17 @@ class HopperPlugin:
         return filtered_df
 
     # ------------------------------------------------------------
-    # Optional: "Auto-serialization" on write_parquet
+    # Optional: "Auto-serialisation" on write_parquet
     # ------------------------------------------------------------
 
     def _write_parquet_plugin(
-        self, file: str, *, format: Literal["binary", "json"] = "json", **kwargs
+        self,
+        file: str,
+        *,
+        format: Literal["binary", "json"] = "json",
+        **kwargs,
     ) -> None:
-        """
-        Called instead of df.config_meta.write_parquet(...).
+        """Intercept df.config_meta.write_parquet(...).
 
         Steps:
           1. Convert in-memory pl.Expr to a safe storable format (json/binary).
@@ -110,13 +114,13 @@ class HopperPlugin:
         exprs = meta.get("hopper_filters", [])
 
         # 1) Convert each expression to the chosen format
-        serialized_data = []
+        serialised_data = []
         for expr in exprs:
-            data = expr.meta.serialize(format=format)
-            serialized_data.append(data)
+            data = expr.meta.serialise(format=format)
+            serialised_data.append(data)
 
         # 2) Store them in a side key, remove original expr objects
-        meta["hopper_filters_serialized"] = (serialized_data, format)
+        meta["hopper_filters_serialised"] = (serialised_data, format)
         meta["hopper_filters"] = []
         self._df.config_meta.set(**meta)
 
@@ -131,24 +135,24 @@ class HopperPlugin:
         #    We'll do the reverse of what we'd do after reading
         restored_exprs = []
         ser_data, ser_fmt = self._df.config_meta.get_metadata()[
-            "hopper_filters_serialized"
+            "hopper_filters_serialised"
         ]
         for item in ser_data:
             if ser_fmt == "json":
-                expr = pl.Expr.deserialize(io.StringIO(item), format="json")
+                expr = pl.Expr.deserialise(io.StringIO(item), format="json")
             else:  # "binary"
-                expr = pl.Expr.deserialize(io.BytesIO(item), format="binary")
+                expr = pl.Expr.deserialise(io.BytesIO(item), format="binary")
             restored_exprs.append(expr)
 
         meta_restored = self._df.config_meta.get_metadata()
         meta_restored["hopper_filters"] = restored_exprs
-        del meta_restored["hopper_filters_serialized"]
+        del meta_restored["hopper_filters_serialised"]
         self._df.config_meta.set(**meta_restored)
 
     def __getattr__(self, name: str):
         """Fallback for calls like df.hopper.select(...).
 
-        Intercept 'write_parquet' calls for auto-serialization.
+        Intercept 'write_parquet' calls for auto-serialisation.
         """
         if name == "write_parquet":
             return self._write_parquet_plugin

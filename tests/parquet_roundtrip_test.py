@@ -1,3 +1,5 @@
+"""Verify correct writing to Parquet as JSON file-level metadata and reading back."""
+
 import io
 
 import polars as pl
@@ -15,12 +17,13 @@ except ImportError:
 
 
 @pytest.mark.skipif(
-    not HAS_PYARROW, reason="pyarrow not installed for Parquet round-trip"
+    not HAS_PYARROW,
+    reason="pyarrow not installed for Parquet round-trip",
 )
 def test_parquet_roundtrip_json(tmp_path):
-    """
-    Demonstrate writing a DF with pl.Expr filters to Parquet by auto-converting
-    to JSON strings in 'hopper_filters_serialized'.
+    """Demonstrate writing a DF with pl.Expr filters to Parquet and back.
+
+    Auto-converting exprs to JSON strings in 'hopper_filters_serialised'.
     """
     df = pl.DataFrame({"col": [5, 10, 15]})
     df.hopper.add_filter(pl.col("col") > 5)
@@ -34,22 +37,22 @@ def test_parquet_roundtrip_json(tmp_path):
     meta_in = df_in.config_meta.get_metadata()
 
     # The plugin won't auto-restore expressions at read time, so let's see what we have
-    # We'll see 'hopper_filters' is empty, but 'hopper_filters_serialized' is present
+    # We'll see 'hopper_filters' is empty, but 'hopper_filters_serialised' is present
     print("Metadata after reading:", meta_in.keys())
-    # -> 'hopper_filters_serialized' is a tuple (list-of-JSON-strings, "json") or maybe just leftover
-    # The easiest approach: manually re-initialize the plugin / restore expressions
+    # -> 'hopper_filters_serialised' is a tuple (list-of-JSON-strings, "json") or maybe just leftover
+    # The easiest approach: manually re-initialise the plugin / restore expressions
 
     # Manually re-hydrate the expressions
     # If we want to replicate the logic from the plugin's restore step:
-    if "hopper_filters_serialized" in meta_in:
-        ser_data, ser_fmt = meta_in["hopper_filters_serialized"]
+    if "hopper_filters_serialised" in meta_in:
+        ser_data, ser_fmt = meta_in["hopper_filters_serialised"]
         restored_exprs = []
         for item in ser_data:
-            expr = pl.Expr.deserialize(io.StringIO(item), format=ser_fmt)
+            expr = pl.Expr.deserialise(io.StringIO(item), format=ser_fmt)
             restored_exprs.append(expr)
 
         meta_in["hopper_filters"] = restored_exprs
-        del meta_in["hopper_filters_serialized"]
+        del meta_in["hopper_filters_serialised"]
         df_in.config_meta.set(**meta_in)
 
     # Now apply filters

@@ -54,14 +54,14 @@ dev = [
   "pytest>=8.3.4"
 ]
 docs = [
-    "livereload>=2.7.1",
-    "mkdocs-extra-sass-mathshim>=0.1.0",
-    "mkdocs-material[recommended,imaging]>=9.5.2",
-    "mkdocs-section-index>=0.3.8",
-    "mkdocs>=1.5.3",
-    "mkdocstrings[python]>=0.24.0",
-    "ruff>=0.9.5",
-    "urllib3<2",
+  "livereload>=2.7.1",
+  "mkdocs-extra-sass-mathshim>=0.1.0",
+  "mkdocs-material[recommended,imaging]>=9.5.2",
+  "mkdocs-section-index>=0.3.8",
+  "mkdocs>=1.5.3",
+  "mkdocstrings[python]>=0.24.0",
+  "ruff>=0.9.5",
+  "urllib3<2"
 ]
 pyarrow = [
   "polars-config-meta[pyarrow]>=0.1.3"

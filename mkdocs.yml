@@ -1,10 +1,10 @@
-site_name: Octopolars
+site_name: polars-expr-hopper
 site_author: Louis Maddox
-site_description: >-
-  Pull, filter, walk, and read a GitHub user's repositories with Polars.
-site_url: https://polars-filter-hopper.vercel.app
-repo_name: lmmx/polars-filter-hopper
-repo_url: https://github.com/lmmx/polars-filter-hopper
+site_description: >
+  Attach Polars expressions for automatic application once required columns exist.
+site_url: https://polars-expr-hopper.vercel.app
+repo_name: lmmx/polars-expr-hopper
+repo_url: https://github.com/lmmx/polars-expr-hopper
 strict: true
 watch: [src]
 

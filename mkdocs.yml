@@ -105,5 +105,3 @@ nav:
   # - Changelog: changelog.md
   - API Reference:
       - api/index.md
-      - "cli": api/cli.md
-      - "inventory": api/inventory.md

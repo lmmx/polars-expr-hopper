@@ -1,19 +1,21 @@
 # API Reference
 
-Welcome to the API Reference for **polars-filter-hopper**!
+Welcome to the API Reference for **polars-expr-hopper**!
 
-Below, you'll find documentation for the library’s primary modules and classes. These pages are
-generated from the source code and include details on function signatures, class methods, and
-parameters used throughout the project. If you're looking for a deeper understanding of how
-**polars-filter-hopper** retrieves and filters GitHub data using Polars, you’ve come to the right place.
+Since **polars-expr-hopper** is a single-module project, all functionality is contained in
+`polars_hopper/__init__.py`. In this reference, you’ll find details on the library’s main
+plugin class (`HopperPlugin`), which attaches a “hopper” of Polars expressions (`pl.Expr`)
+to each `DataFrame` under the `.hopper` namespace. These expressions can be automatically
+applied as soon as their required columns appear.
 
-Use the navigation panel on the left to explore each module. You’ll see how to:
-- Initialize and configure an `Inventory` for GitHub repositories,
-- Apply filters using Polars expressions or DSL syntax (`{column}.str.startswith("foo")`),
-- Recursively list and inspect files in repos,
-- Cache results to speed up repeated calls,
-- And more!
+You’ll see method signatures, class methods, and parameters that let you:
 
-If you’re new to the project, start with the main [Get Started](../get_started.md) guide to see
-installation instructions and CLI usage examples. After that, you can return here for a thorough,
-module-by-module breakdown of the **polars-filter-hopper** codebase.
+- Add expressions (e.g., `df.hopper.add_filter(pl.col("age") > 18)`)
+- Check which columns are missing and skip or apply expressions dynamically
+- Optionally serialize expressions to JSON/binary for Parquet round-trip (if needed)
+
+If you’re new to the project, you might start with the main [Get Started](../get_started.md) guide
+or the README to see basic usage and installation steps. Then come back here for a thorough
+look at the plugin’s APIs.
+
+::: polars_hopper

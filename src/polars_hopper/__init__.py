@@ -7,7 +7,7 @@ themselves when the necessary columns exist, removing themselves once used.
 """
 
 import polars as pl
-import polars_config_meta  # ensures df.config_meta is available
+import polars_config_meta
 from polars.api import register_dataframe_namespace
 
 
@@ -55,8 +55,8 @@ class HopperPlugin:
         A new (possibly filtered) DataFrame. If it differs from self._df,
         polars-config-meta merges metadata automatically.
         """
-        meta_old = self._df.config_meta.get_metadata()
-        current_exprs = meta_old.get("hopper_filters", [])
+        meta_pre = self._df.config_meta.get_metadata()
+        current_exprs = meta_pre.get("hopper_filters", [])
         still_pending = []
         filtered_df = self._df
         applied_any = False
@@ -71,14 +71,14 @@ class HopperPlugin:
                 applied_any = True
 
         # Update old DF's metadata
-        meta_old["hopper_filters"] = still_pending
-        self._df.config_meta.set(**meta_old)
+        meta_pre["hopper_filters"] = still_pending
+        self._df.config_meta.set(**meta_pre)
 
         # If we actually created a new DataFrame, also update its metadata
         if applied_any and id(filtered_df) != id(self._df):
-            meta_new = filtered_df.config_meta.get_metadata()
-            meta_new["hopper_filters"] = still_pending
-            filtered_df.config_meta.set(**meta_new)
+            meta_post = filtered_df.config_meta.get_metadata()
+            meta_post["hopper_filters"] = still_pending
+            filtered_df.config_meta.set(**meta_post)
 
         return filtered_df
 

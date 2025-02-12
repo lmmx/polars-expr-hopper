@@ -1,3 +1,5 @@
+"""Tests for Parquet round-trip of metadata (RQ4)."""
+
 import polars as pl
 import pytest
 from polars_config_meta import read_parquet_with_meta
@@ -8,6 +10,7 @@ from polars_config_meta import read_parquet_with_meta
 )
 def test_parquet_roundtrip(tmp_path):
     """PRD RQ4: The plugin should embed/recover hopper_filters in Parquet.
+
     Skipped by default because JSON cannot serialize Python lambdas.
     """
     df = pl.DataFrame({"col": [5, 10, 15]})

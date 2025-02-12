@@ -1,11 +1,13 @@
+"""Tests for early pruning of rows when columns become available (RQ5)."""
+
 import polars as pl
 
 
 def test_early_pruning():
-    """PRD RQ5: The plugin removes rows as soon as columns appear."""
+    """PRD RQ5: The plugin removes rows as soon as columns appear, preventing waste."""
     df = pl.DataFrame({"repo_is_fork": [False, True, True, False]})
-    # Create the hopper_filters list
-    df.config_meta.set(hopper_filters=[lambda df_: pl.col("repo_is_fork") == False])
+    # Use .eq(False) instead of == False
+    df.config_meta.set(hopper_filters=[lambda df_: pl.col("repo_is_fork").eq(False)])
 
     df2 = df.hopper.apply_ready_filters()
     assert df2.shape == (2, 1), "Should remove rows with repo_is_fork==True."

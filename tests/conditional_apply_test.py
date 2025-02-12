@@ -1,17 +1,16 @@
+"""Tests for conditional filter application (RQ2)."""
+
 import polars as pl
 
 
 def test_conditional_apply():
-    """PRD RQ2: The plugin applies filters only if columns exist,
-    removing successful filters from the hopper.
-    """
+    """PRD RQ2: The plugin applies filters only if columns exist, then removes them on success."""
     df = pl.DataFrame({"user_id": [0, 1, 2]})
     # Add a filter referencing age
     df.hopper.add_filter(lambda df_: pl.col("age") > 18)
 
     # Apply
     df2 = df.hopper.apply_ready_filters()
-    # No change yet
     assert df2.shape == (3, 1)
     meta = df2.config_meta.get_metadata()
     assert len(meta["hopper_filters"]) == 1, "Filter remains pending."

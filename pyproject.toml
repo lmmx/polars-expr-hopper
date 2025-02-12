@@ -6,7 +6,7 @@ requires = [
 
 [project]
 name = "polars-expr-hopper"
-version = "0.1.0"
+version = "0.1.1"
 description = "A Polars plugin providing a 'hopper' of expressions for automatic, schema-aware application."
 readme = "README.md"
 requires-python = ">=3.9"

@@ -7,7 +7,7 @@ def test_conditional_apply():
     """PRD RQ2: The plugin applies filters only if columns exist, then removes them on success."""
     df = pl.DataFrame({"user_id": [0, 1, 2]})
     # Add a filter referencing age
-    df.hopper.add_filter(lambda df_: pl.col("age") > 18)
+    df.hopper.add_filter(pl.col("age") > 18)
 
     # Apply
     df2 = df.hopper.apply_ready_filters()

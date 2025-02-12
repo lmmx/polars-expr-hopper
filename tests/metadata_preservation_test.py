@@ -6,7 +6,7 @@ import polars as pl
 def test_metadata_preservation():
     """PRD RQ3: The plugin preserves hopper_filters across df.config_meta.* transformations."""
     df = pl.DataFrame({"idx": [10, 20, 30]})
-    df.config_meta.set(hopper_filters=[lambda df_: pl.col("idx") < 25])
+    df.config_meta.set(hopper_filters=[pl.col("idx") < 25])
 
     df2 = df.config_meta.select(pl.col("idx"))
 

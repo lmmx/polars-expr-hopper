@@ -6,7 +6,7 @@
 [![PyPI](https://img.shields.io/pypi/v/polars-filter-hopper.svg)](https://pypi.org/project/polars-filter-hopper)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/polars-filter-hopper.svg)](https://pypi.org/project/polars-filter-hopper)
 [![License](https://img.shields.io/pypi/l/polars-filter-hopper.svg)](https://pypi.org/project/polars-filter-hopper)
-[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/YOUR_ORG/polars-filter-hopper/master.svg)](https://results.pre-commit.ci/latest/github/YOUR_ORG/polars-filter-hopper/master)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/lmmx/polars-filter-hopper/master.svg)](https://results.pre-commit.ci/latest/github/lmmx/polars-filter-hopper/master)
 
 **Polars plugin providing a ‘filter hopper’**—a flexible, DataFrame-level container of filters (predicates) that apply themselves **as soon as** the relevant columns appear.
 
@@ -106,7 +106,7 @@ Because we use Polars’ plugin system and store the metadata in a dictionary ke
 
 ## Contributing
 
-Maintained by [YOUR_NAME/ORG](https://github.com/YOUR_ORG/polars-filter-hopper). Contributions welcome!
+Maintained by [Louis Maddox](https://github.com/lmmx/polars-filter-hopper). Contributions welcome!
 
 1. **Issues & Discussions**: Please open a GitHub issue or discussion for bugs, feature requests, or questions.
 2. **Pull Requests**: PRs are welcome!

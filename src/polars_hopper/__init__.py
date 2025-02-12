@@ -62,13 +62,14 @@ class HopperPlugin:
         applied_any = False
 
         for expr in current_exprs:
-            try:
+            needed_cols = expr.meta.root_names()
+            available_cols = filtered_df.collect_schema()
+            if all(c in available_cols for c in needed_cols):
                 filtered_df = filtered_df.filter(expr)
-            except Exception:
-                # Missing column or other error => keep the expression for later
-                still_pending.append(expr)
-            else:
                 applied_any = True
+            else:
+                # Missing column => keep the expression for later
+                still_pending.append(expr)
 
         # Update old DF's metadata
         meta_pre["hopper_filters"] = still_pending

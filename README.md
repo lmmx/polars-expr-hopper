@@ -1,30 +1,30 @@
-# polars-filter-hopper
+# polars-expr-hopper
 
-<!-- [![downloads](https://static.pepy.tech/badge/polars-filter-hopper/month)](https://pepy.tech/project/polars-filter-hopper) -->
+<!-- [![downloads](https://static.pepy.tech/badge/polars-expr-hopper/month)](https://pepy.tech/project/polars-expr-hopper) -->
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![pdm-managed](https://img.shields.io/badge/pdm-managed-blueviolet)](https://pdm.fming.dev)
-[![PyPI](https://img.shields.io/pypi/v/polars-filter-hopper.svg)](https://pypi.org/project/polars-filter-hopper)
-[![Supported Python versions](https://img.shields.io/pypi/pyversions/polars-filter-hopper.svg)](https://pypi.org/project/polars-filter-hopper)
-[![License](https://img.shields.io/pypi/l/polars-filter-hopper.svg)](https://pypi.org/project/polars-filter-hopper)
-[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/lmmx/polars-filter-hopper/master.svg)](https://results.pre-commit.ci/latest/github/lmmx/polars-filter-hopper/master)
+[![PyPI](https://img.shields.io/pypi/v/polars-expr-hopper.svg)](https://pypi.org/project/polars-expr-hopper)
+[![Supported Python versions](https://img.shields.io/pypi/pyversions/polars-expr-hopper.svg)](https://pypi.org/project/polars-expr-hopper)
+[![License](https://img.shields.io/pypi/l/polars-expr-hopper.svg)](https://pypi.org/project/polars-expr-hopper)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/lmmx/polars-expr-hopper/master.svg)](https://results.pre-commit.ci/latest/github/lmmx/polars-expr-hopper/master)
 
-**Polars plugin providing a ‘filter hopper’**—a flexible, DataFrame-level container of filters (predicates) that apply themselves **as soon as** the relevant columns appear.
+**Polars plugin providing a ‘expression hopper’**—a flexible, DataFrame-level container of expressions (predicates such as filter) that apply themselves **as soon as** the relevant columns are available.
 
 Powered by [polars-config-meta](https://pypi.org/project/polars-config-meta/) for persistent DataFrame-level metadata.
 
-Simplify data pipelines by storing your filters in a single location and letting them apply **as soon as** the corresponding columns exist in the DataFrame schema.
+Simplify data pipelines by storing your expressions in a single location and letting them apply **as soon as** the corresponding columns exist in the DataFrame schema.
 
 ## Installation
 
 ```bash
-pip install polars-filter-hopper
+pip install polars-expr-hopper
 ```
 
 > The `polars` dependency is required but not included in the package by default.
 > It is shipped as an optional extra which can be activated by passing it in square brackets:
 > ```bash
-> pip install polars-filter-hopper[polars]           # for standard Polars
-> pip install polars-filter-hopper[polars-lts-cpu]   # for older CPUs
+> pip install polars-expr-hopper[polars]           # for standard Polars
+> pip install polars-expr-hopper[polars-lts-cpu]   # for older CPUs
 > ```
 
 ### Requirements
@@ -36,10 +36,10 @@ pip install polars-filter-hopper
 ## Features
 
 - **DataFrame-Level Filter Management**: Store multiple predicate functions on a DataFrame via the `.hopper` namespace.
-- **Apply When Ready**: Each filter is automatically applied once the DataFrame has all columns required by that filter.
+- **Apply When Ready**: Each expression is automatically applied once the DataFrame has all columns required by that expression.
 - **Namespace Plugin**: Access everything through `df.hopper.*(...)`—no subclassing or monkey-patching.
-- **Metadata Preservation**: Transformations called through `df.hopper.<method>()` keep the same filter hopper on the new DataFrame.
-- **No Central Orchestration**: Avoid fiddly pipeline step names or schemas—just attach your filters once, and they get applied in the right order automatically.
+- **Metadata Preservation**: Transformations called through `df.hopper.<method>()` keep the same expression hopper on the new DataFrame.
+- **No Central Orchestration**: Avoid fiddly pipeline step names or schemas—just attach your expressions once, and they get applied in the right order automatically.
 
 ## Usage
 
@@ -55,11 +55,11 @@ df = pl.DataFrame({
     "name": ["Alice", "Bob", "Charlie", "NullUser"]
 })
 
-# Add filters to the hopper:
+# Add expressions to the hopper:
 #  - This one needs 'user_id' (which exists now).
 #  - We'll also add one needing a future 'age' column.
-df.hopper.add_filter(lambda df: df["user_id"] != 0)
-df.hopper.add_filter(lambda df: df["age"] > 18)  # 'age' doesn't exist yet
+df.hopper.add_filter(pl.col("user_id") != 0)
+df.hopper.add_filter(pl.col("age") > 18)  # 'age' doesn't exist yet
 
 # Apply what we can; the first filter is immediately valid:
 df = df.hopper.apply_ready_filters()
@@ -76,22 +76,22 @@ df2 = df.hopper.with_columns(
 # Now the second filter can be applied:
 df2 = df2.hopper.apply_ready_filters()
 print(df2)
-# Only rows with age>18 remain. That filter is then removed from the hopper.
+# Only rows with age > 18 remain. That filter expression is then removed from the hopper.
 ```
 
 ### How It Works
 
-Internally, **polars-filter-hopper** attaches a small “manager” object to your `DataFrame` (similar to how [polars-config-meta](https://pypi.org/project/polars-config-meta/) does). This manager:
+Internally, **polars-expr-hopper** attaches a small “manager” object to your `DataFrame` (similar to how [polars-config-meta](https://pypi.org/project/polars-config-meta/) does). This manager:
 
-- Keeps track of a list (or set) of filters (callable predicates).
-- On `apply_ready_filters()`, checks each filter’s required columns.
-- Applies those filters that are valid for the current schema.
-- Removes applied filters from the “hopper.”
+- Keeps track of a list (or set) of expressions (callable predicates).
+- On `apply_ready_filters()`, checks each filter expression’s required columns.
+- Applies those filter expressions that are valid for the current schema.
+- Removes applied filter expressions from the “hopper.”
 - Copies the hopper forward when you call `df.hopper.select(...)`, `df.hopper.with_columns(...)`, etc.
 
 Because we use Polars’ plugin system and store the metadata in a dictionary keyed by `id(df)`, the same patterns (weak references, no monkey-patching, etc.) described in **polars-config-meta** apply here as well.
 
-### Example API Methods
+### API Methods
 
 - **`add_filter(predicate: Callable[[pl.DataFrame], pl.Series])`**
   Add a new predicate (lambda, function, Polars expression, etc.) to the hopper.
@@ -106,7 +106,7 @@ Because we use Polars’ plugin system and store the metadata in a dictionary ke
 
 ## Contributing
 
-Maintained by [Louis Maddox](https://github.com/lmmx/polars-filter-hopper). Contributions welcome!
+Maintained by [Louis Maddox](https://github.com/lmmx/polars-expr-hopper). Contributions welcome!
 
 1. **Issues & Discussions**: Please open a GitHub issue or discussion for bugs, feature requests, or questions.
 2. **Pull Requests**: PRs are welcome!

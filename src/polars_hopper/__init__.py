@@ -1,7 +1,7 @@
 """Polars hopper plugin.
 
 Register a ".hopper" namespace on Polars DataFrame objects for managing
-a 'hopper' of Polars expressions (filters). The filters are stored as
+a 'hopper' of Polars expressions (e.g. filters). The expressions are stored as
 metadata in `df.config_meta` (provided by polars-config-meta). They apply
 themselves when the necessary columns exist, removing themselves once used.
 """

@@ -5,15 +5,16 @@ requires = [
 ]
 
 [project]
-name = "polars-filter-hopper"
+name = "polars-expr-hopper"
 version = "0.1.0"
-description = "A Polars plugin providing a 'hopper' of filters for automatic, schema-aware application."
+description = "A Polars plugin providing a 'hopper' of expressions for automatic, schema-aware application."
 readme = "README.md"
 requires-python = ">=3.9"
 keywords = [
   "polars",
   "plugin",
   "filter",
+  "expr",
   "metadata"
 ]
 license = {text = "MIT"}
@@ -57,9 +58,9 @@ pyarrow = [
 ]
 
 [project.urls]
-Documentation = "https://polars-filter-hopper.vercel.app/"
-Homepage = "https://github.com/lmmx/polars-filter-hopper"
-Repository = "https://github.com/lmmx/polars-filter-hopper.git"
+Documentation = "https://polars-expr-hopper.vercel.app/"
+Homepage = "https://github.com/lmmx/polars-expr-hopper"
+Repository = "https://github.com/lmmx/polars-expr-hopper.git"
 
 [tool.ruff]
 

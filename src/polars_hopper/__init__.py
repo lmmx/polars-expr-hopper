@@ -116,7 +116,7 @@ class HopperPlugin:
         # 1) Convert each expression to the chosen format
         serialised_data = []
         for expr in exprs:
-            data = expr.meta.serialise(format=format)
+            data = expr.meta.serialize(format=format)
             serialised_data.append(data)
 
         # 2) Store them in a side key, remove original expr objects
@@ -139,9 +139,9 @@ class HopperPlugin:
         ]
         for item in ser_data:
             if ser_fmt == "json":
-                expr = pl.Expr.deserialise(io.StringIO(item), format="json")
+                expr = pl.Expr.deserialize(io.StringIO(item), format="json")
             else:  # "binary"
-                expr = pl.Expr.deserialise(io.BytesIO(item), format="binary")
+                expr = pl.Expr.deserialize(io.BytesIO(item), format="binary")
             restored_exprs.append(expr)
 
         meta_restored = self._df.config_meta.get_metadata()

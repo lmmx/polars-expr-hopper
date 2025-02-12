@@ -48,7 +48,7 @@ def test_parquet_roundtrip_json(tmp_path):
         ser_data, ser_fmt = meta_in["hopper_filters_serialised"]
         restored_exprs = []
         for item in ser_data:
-            expr = pl.Expr.deserialise(io.StringIO(item), format=ser_fmt)
+            expr = pl.Expr.deserialize(io.StringIO(item), format=ser_fmt)
             restored_exprs.append(expr)
 
         meta_in["hopper_filters"] = restored_exprs

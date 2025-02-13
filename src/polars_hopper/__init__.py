@@ -116,13 +116,14 @@ class HopperPlugin:
         self._df.config_meta.update(meta)
 
     def pop_expr_from_registry(self, expr: pl.Expr) -> bool:
-        """
-        Remove the earliest row from 'hopper_expr_register' that matches the given pl.Expr
-        by comparing JSON-serialised expressions.
+        """Remove earliest row from 'hopper_expr_register' that matches given pl.Expr.
+
+        Do so by comparing JSON-serialised expressions.
 
         Returns
         -------
         True if a matching row was found and removed; False if no match was found.
+
         """
         meta = self._df.config_meta.get_metadata()
         hopper_reg_key = "hopper_expr_register"
@@ -140,7 +141,7 @@ class HopperPlugin:
         # 3) Find all rows whose 'expr' matches, e.g. ignoring 'applied' or 'kind'
         #    If you want to consider 'kind' or only rows where 'applied'==False,
         #    you can refine this filter accordingly.
-        matching = registry_df.filter(pl.col("expr") == serialized_expr)
+        matching = registry_df.filter(pl.col("expr") == serialized_expr).limit(1)
 
         if matching.is_empty():
             return False  # No match found => do nothing

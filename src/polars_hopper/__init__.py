@@ -55,6 +55,7 @@ class HopperPlugin:
             - 'a' => hopper_addcols
         exprs : pl.Expr
             The actual Polars expressions to add.
+
         """
         meta = self._df.config_meta.get_metadata()
 
@@ -74,7 +75,8 @@ class HopperPlugin:
         pre_idx = meta.get("hopper_max_idx", -1)
         # Increment hopper_max_idx for each newly added expression
         post_idx = pre_idx + len(exprs)
-        new_exprs_idxs = range(pre_idx + 1, post_idx)
+        # WIP
+        new_exprs_idxs = range(pre_idx + 1, post_idx)  # noqa
         meta["hopper_max_idx"] = post_idx
 
         # Write updated metadata back

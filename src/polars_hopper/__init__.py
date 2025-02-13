@@ -57,6 +57,9 @@ class HopperPlugin:
             The actual Polars expressions to add.
 
         """
+        if not exprs:
+            return
+
         meta = self._df.config_meta.get_metadata()
 
         # Ensure the correct list in metadata
@@ -100,7 +103,19 @@ class HopperPlugin:
             for expr_offset, expr in enumerate(exprs)
         ]
         meta["hopper_expr_register"] = pl.concat(
-            [pre_reg, pl.DataFrame(registrands)]
+            [
+                pre_reg,
+                pl.DataFrame(
+                    registrands,
+                    schema={
+                        "idx": pl.Int64,
+                        "kind": pl.String,
+                        "expr": pl.String,
+                        "applied": pl.Boolean,
+                        "root_names": pl.List(pl.String),
+                    },
+                ),
+            ]
         ).write_ndjson()
         meta["hopper_max_idx"] = post_idx
 

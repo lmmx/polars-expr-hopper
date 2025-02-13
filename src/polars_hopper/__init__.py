@@ -34,7 +34,7 @@ class HopperPlugin:
         if "hopper_selects" not in meta:
             meta["hopper_selects"] = []
 
-        df.config_meta.set(**meta)
+        df.config_meta.update(meta)
 
     # -------------------------------------------------------------------------
     # Filter storage and application
@@ -50,7 +50,7 @@ class HopperPlugin:
         filters = meta.get("hopper_filters", [])
         filters.extend(exprs)
         meta["hopper_filters"] = filters
-        self._df.config_meta.set(**meta)
+        self._df.config_meta.update(meta)
 
     def list_filters(self) -> list[pl.Expr]:
         """Return the list of pending Polars filter expressions."""
@@ -80,7 +80,7 @@ class HopperPlugin:
             needed_cols = set(expr.meta.root_names())
             if needed_cols <= avail_cols:
                 # All needed columns exist; apply the filter
-                filtered_df = filtered_df.filter(expr)
+                filtered_df = filtered_df.hopper.filter(expr)
                 applied_any = True
                 # Update available columns if needed
                 avail_cols = set(filtered_df.columns)
@@ -90,13 +90,13 @@ class HopperPlugin:
 
         # Update old DF's metadata
         meta_pre["hopper_filters"] = still_pending
-        self._df.config_meta.set(**meta_pre)
+        self._df.config_meta.update(meta_pre)
 
         # If we actually created a new DataFrame, also update its metadata
         if applied_any and id(filtered_df) != id(self._df):
             meta_post = filtered_df.config_meta.get_metadata()
             meta_post["hopper_filters"] = still_pending
-            filtered_df.config_meta.set(**meta_post)
+            filtered_df.config_meta.update(meta_post)
 
         return filtered_df
 
@@ -114,7 +114,7 @@ class HopperPlugin:
         selects = meta.get("hopper_selects", [])
         selects.extend(exprs)
         meta["hopper_selects"] = selects
-        self._df.config_meta.set(**meta)
+        self._df.config_meta.update(meta)
 
     def list_selects(self) -> list[pl.Expr]:
         """Return the list of pending Polars select expressions."""
@@ -145,7 +145,7 @@ class HopperPlugin:
             avail_cols = set(selected_df.columns)
             if needed_cols <= avail_cols:
                 # We can apply this select
-                selected_df = selected_df.select(expr)
+                selected_df = selected_df.hopper.select(expr)
                 applied_any = True
             else:
                 # Missing columns => keep in the queue
@@ -153,13 +153,13 @@ class HopperPlugin:
 
         # Update old DF's metadata
         meta_pre["hopper_selects"] = still_pending
-        self._df.config_meta.set(**meta_pre)
+        self._df.config_meta.update(meta_pre)
 
         # If a new DataFrame was produced, update its metadata as well
         if applied_any and id(selected_df) != id(self._df):
             meta_post = selected_df.config_meta.get_metadata()
             meta_post["hopper_selects"] = still_pending
-            selected_df.config_meta.set(**meta_post)
+            selected_df.config_meta.update(meta_post)
 
         return selected_df
 
@@ -201,7 +201,7 @@ class HopperPlugin:
         meta["hopper_filters"] = []
         meta["hopper_selects_serialised"] = (serialized_selects, format)
         meta["hopper_selects"] = []
-        self._df.config_meta.set(**meta)
+        self._df.config_meta.update(meta)
 
         # 3) Actually write parquet using polars_config_meta's fallback
         original_write_parquet = getattr(self._df.config_meta, "write_parquet", None)
@@ -243,7 +243,7 @@ class HopperPlugin:
         del meta_after["hopper_filters_serialised"]
         del meta_after["hopper_selects_serialised"]
 
-        self._df.config_meta.set(**meta_after)
+        self._df.config_meta.update(meta_after)
 
     def __getattr__(self, name: str):
         """Fallback for calls like df.hopper.select(...), etc.

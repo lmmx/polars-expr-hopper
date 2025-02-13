@@ -28,6 +28,7 @@ meta_key_lookup = {
     "s": "hopper_selects",
     "a": "hopper_addcols",
 }
+debug = False
 
 
 @register_dataframe_namespace("hopper")
@@ -249,71 +250,86 @@ class HopperPlugin:
                 "No expression kinds specified. Provide at least one of 'f','s','a'.",
             )
 
-        registry = self._read_expr_registry()
-        candidates = registry.filter(pl.col("kind").is_in(kinds)).sort("idx")
-
-        if candidates.is_empty():
-            return self._df
-
         # We'll apply them in the order the user specified
         new_df = self._df
-        # Which metadata key do we read/write (hopper_filters, hopper_selects, or hopper_addcols)?
 
-        meta_pre = self._df.config_meta.get_metadata()
+        while True:
+            registry = self._read_expr_registry()
+            candidates = registry.filter(pl.col("kind").is_in(kinds)).sort("idx")
 
-        still_pending = []
-        changed_any = False
+            if candidates.is_empty():
+                break
 
-        for row in candidates.iter_rows(named=True):
-            expr_str = row["expr"]
-            row_kind = row["kind"]
-            meta_key = meta_key_lookup[row_kind]
-            current_exprs = meta_pre.get(meta_key, [])
-            assert current_exprs, f"Registry is inconsistent with {meta_key}"
-            expr = next(
-                (
-                    ck
-                    for ck in current_exprs
-                    if ck.meta.serialize(format="json") == expr_str
-                ),
-                None,
-            )
-            assert expr is not None, f"Registry is inconsistent with {meta_key}"
-            needed_cols = set(expr.meta.root_names())
-            # We'll track available columns after each expression is applied
-            avail_cols = set(new_df.collect_schema())
-            if needed_cols <= avail_cols:
-                r0 = self._read_expr_registry()
-                removed = self.pop_expr_from_registry(expr)
-                assert removed, f"Expr {expr} was not popped from registry"
-                r1 = self._read_expr_registry()
-                assert (
-                    n_popped := len(r0) - len(r1)
-                ) == 1, f"Registry popped {n_popped} items"
-                if not removed:
-                    raise ValueError(f"Inconsistent registry: {expr} not found")
+            # Which metadata key do we read/write (hopper_filters, hopper_selects, or hopper_addcols)?
 
-                # Actually apply the expression
-                new_df = self._apply_expression(new_df, row_kind, expr)
-                changed_any = True
-                # Update available columns in case columns changed
+            meta_pre = self._df.config_meta.get_metadata()
+
+            still_pending = {k: [] for k in kinds}
+            changed_any = False
+
+            for row in candidates.iter_rows(named=True):
+                expr_str = row["expr"]
+                row_kind = row["kind"]
+                meta_key = meta_key_lookup[row_kind]
+                current_exprs = meta_pre.get(meta_key, [])
+                assert current_exprs, f"Registry is inconsistent with {meta_key}"
+                expr = next(
+                    (
+                        ck
+                        for ck in current_exprs
+                        if ck.meta.serialize(format="json") == expr_str
+                    ),
+                    None,
+                )
+                assert expr is not None, f"Registry is inconsistent with {meta_key}"
+                needed_cols = set(expr.meta.root_names())
+                # We'll track available columns after each expression is applied
                 avail_cols = set(new_df.collect_schema())
-            else:
-                # Missing columns => keep it pending
-                still_pending.append(expr)
+                if needed_cols <= avail_cols:
+                    r0 = self._read_expr_registry()
+                    removed = self.pop_expr_from_registry(expr)
+                    if debug:
+                        print(f"Popped {expr}")
+                    assert removed, f"Expr {expr} was not popped from registry"
+                    r1 = self._read_expr_registry()
+                    assert (
+                        n_popped := len(r0) - len(r1)
+                    ) == 1, f"Registry popped {n_popped} items"
+                    if not removed:
+                        raise ValueError(f"Inconsistent registry: {expr} not found")
 
-        # Update old DF's metadata list (filters/selects/addcols)
-        meta_pre[meta_key] = still_pending
-        self._df.config_meta.update(meta_pre)
+                    # Actually apply the expression
+                    new_df = self._apply_expression(new_df, row_kind, expr)
+                    changed_any = True
+                    # Update available columns in case columns changed
+                    avail_cols = set(new_df.collect_schema())
+                else:
+                    # Missing columns => keep it pending
+                    if debug:
+                        print(f"Appending {expr} to still_pending {row_kind}")
+                    still_pending[row_kind].append(expr)
 
-        # If new_df is indeed a new object, also update that DF's metadata
-        if changed_any and id(new_df) != id(self._df):
-            self._refresh_expr_registry()
-            meta_post = new_df.config_meta.get_metadata()
-            meta_post[meta_key] = still_pending
-            fresh_registry = self._df.config_meta.get_metadata()[hopper_reg_key]
-            meta_post[hopper_reg_key] = fresh_registry
-            new_df.config_meta.update(meta_post)
+            # Update old DF's metadata list (filters/selects/addcols)
+            pending_updates = {meta_key_lookup[k]: p for k, p in still_pending.items()}
+            meta_pre.update(pending_updates)
+            self._df.config_meta.update(meta_pre)
+
+            if not changed_any:
+                break
+
+            # If new_df is indeed a new object, also update that DF's metadata
+            if id(new_df) != id(self._df):
+                self._refresh_expr_registry()
+                meta_post = new_df.config_meta.get_metadata()
+
+                pending_updates = {
+                    meta_key_lookup[k]: p for k, p in still_pending.items()
+                }
+                meta_post.update(pending_updates)
+
+                fresh_registry = self._df.config_meta.get_metadata()[hopper_reg_key]
+                meta_post[hopper_reg_key] = fresh_registry
+                new_df.config_meta.update(meta_post)
 
         return new_df
 

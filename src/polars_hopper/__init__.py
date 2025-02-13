@@ -66,6 +66,7 @@ class HopperPlugin:
         -------
         A new (possibly filtered) DataFrame. If it differs from self._df,
         polars-config-meta merges metadata automatically.
+
         """
         meta_pre = self._df.config_meta.get_metadata()
         current_exprs = meta_pre.get("hopper_filters", [])
@@ -131,6 +132,7 @@ class HopperPlugin:
         Returns
         -------
         A new DataFrame with the successfully selected/transformed columns.
+
         """
         meta_pre = self._df.config_meta.get_metadata()
         current_exprs = meta_pre.get("hopper_selects", [])
@@ -184,11 +186,15 @@ class HopperPlugin:
 
         # 1) Convert each filter expression
         exprs_filters = meta.get("hopper_filters", [])
-        serialized_filters = [expr.meta.serialize(format=format) for expr in exprs_filters]
+        serialized_filters = [
+            expr.meta.serialize(format=format) for expr in exprs_filters
+        ]
 
         # 1b) Convert each select expression
         exprs_selects = meta.get("hopper_selects", [])
-        serialized_selects = [expr.meta.serialize(format=format) for expr in exprs_selects]
+        serialized_selects = [
+            expr.meta.serialize(format=format) for expr in exprs_selects
+        ]
 
         # 2) Store them in side keys, remove original expression objects
         meta["hopper_filters_serialised"] = (serialized_filters, format)
@@ -211,16 +217,24 @@ class HopperPlugin:
         restored_filters = []
         for item in f_ser_data:
             if f_ser_fmt == "json":
-                restored_filters.append(pl.Expr.deserialize(io.StringIO(item), format="json"))
+                restored_filters.append(
+                    pl.Expr.deserialize(io.StringIO(item), format="json"),
+                )
             else:  # "binary"
-                restored_filters.append(pl.Expr.deserialize(io.BytesIO(item), format="binary"))
+                restored_filters.append(
+                    pl.Expr.deserialize(io.BytesIO(item), format="binary"),
+                )
 
         restored_selects = []
         for item in s_ser_data:
             if s_ser_fmt == "json":
-                restored_selects.append(pl.Expr.deserialize(io.StringIO(item), format="json"))
+                restored_selects.append(
+                    pl.Expr.deserialize(io.StringIO(item), format="json"),
+                )
             else:  # "binary"
-                restored_selects.append(pl.Expr.deserialize(io.BytesIO(item), format="binary"))
+                restored_selects.append(
+                    pl.Expr.deserialize(io.BytesIO(item), format="binary"),
+                )
 
         meta_after["hopper_filters"] = restored_filters
         meta_after["hopper_selects"] = restored_selects

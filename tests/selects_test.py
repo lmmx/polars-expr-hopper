@@ -4,10 +4,10 @@ import polars as pl
 
 
 def test_store_selects():
-    """
-    RQ6:
-      The plugin shall store Polars select expressions in 'hopper_selects'
-      whenever the user calls df.hopper.add_selects(...).
+    """RQ6.
+
+    The plugin shall store Polars select expressions in 'hopper_selects'
+    whenever the user calls df.hopper.add_selects(...).
     """
     df = pl.DataFrame({"id": [1, 2, 3], "val": [10, 20, 30]})
     meta_before = df.config_meta.get_metadata()
@@ -24,12 +24,12 @@ def test_store_selects():
 
 
 def test_apply_ready_selects_complete():
-    """
-    RQ7 + RQ10:
-      - The plugin shall apply each stored select expression only
-        when all referenced columns exist, removing it on success.
-      - The resulting DataFrame shall contain only columns
-        produced by the applied select expressions.
+    """RQ7 + RQ10.
+
+    - The plugin shall apply each stored select expression only
+      when all referenced columns exist, removing it on success.
+    - The resulting DataFrame shall contain only columns
+      produced by the applied select expressions.
     """
     df = pl.DataFrame({"x": [10, 20, 30], "y": [1, 2, 3]})
     # Add a select expression referencing existing columns
@@ -56,7 +56,7 @@ def test_apply_ready_selects_complete():
     # This is normal due to the sequence each expression is tried in.
 
     assert df_selected.columns == [
-        "x"
+        "x",
     ], "Only 'x' should be present after the first successful select."
     meta_after = df_selected.config_meta.get_metadata()
     still_pending = meta_after.get("hopper_selects", [])
@@ -66,10 +66,10 @@ def test_apply_ready_selects_complete():
 
 
 def test_apply_ready_selects_with_missing_cols():
-    """
-    RQ7:
-      The plugin shall not apply a select expression if its referenced columns
-      do not exist, leaving that expression pending.
+    """RQ7.
+
+    The plugin shall not apply a select expression if its referenced columns
+    do not exist, leaving that expression pending.
     """
     df = pl.DataFrame({"a": [5, 6, 7]})
     # Add a select expression that references a missing column 'b'
@@ -101,11 +101,11 @@ def test_apply_ready_selects_with_missing_cols():
 
 
 def test_preservation_selects():
-    """
-    RQ8:
-      The plugin shall preserve 'hopper_selects' metadata across DataFrame
-      transformations (like .select or .with_columns) unless the expressions
-      have been applied or removed.
+    """RQ8.
+
+    The plugin shall preserve 'hopper_selects' metadata across DataFrame
+    transformations (like .select or .with_columns) unless the expressions
+    have been applied or removed.
     """
     df = pl.DataFrame({"u": [1, 2], "v": [10, 20]})
     df.hopper.add_selects(pl.col("u") * 2, pl.col("v") - 5)
@@ -121,22 +121,6 @@ def test_preservation_selects():
 
     # Now apply them
     df3 = df2.hopper.apply_ready_selects()
-    # The first expression references 'u' => valid
-    # The second references 'v' => valid.
-    # The final DataFrame is from the second expression in sequence.
-    # That means it yields (v - 5).
-    # The second expression sees 'u' or 'v'? Wait,
-    # after the first expression is done, the new DF only has the column from that expression.
-    # So the second expression referencing 'v' won't find 'v'.
-    # But let's keep it simpler: if the plugin tries them in order,
-    # after the first expression, the DF only has a single column named something
-    # like "u * 2" if the user didn't alias it.
-    # So let's check what actually happens.
-    # We test correctness of "pending" logic.
-    # The main point is that the metadata is present until used or removed.
-
-    # The net effect is that the first expression is applied, giving 1 column.
-    # The second one is missing its needed column, so remains pending.
     assert df3.columns == ["u"], "After applying the first select, only 'u' remains."
     assert (
         len(df3.config_meta.get_metadata().get("hopper_selects", [])) == 1
@@ -144,11 +128,11 @@ def test_preservation_selects():
 
 
 def test_multiple_selects_sequence():
-    """
-    RQ9:
-      The plugin shall apply multiple select expressions in sequence
-      if all referenced columns exist for each expression, leaving incomplete
-      expressions for future runs.
+    """RQ9.
+
+    The plugin shall apply multiple select expressions in sequence
+    if all referenced columns exist for each expression, leaving incomplete
+    expressions for future runs.
     """
     df = pl.DataFrame({"col1": [100, 200], "col2": [10, 20], "col3": [1, 2]})
     # We add three expressions:
@@ -181,7 +165,7 @@ def test_multiple_selects_sequence():
     # The third expression needs "col1" & "col3", but the new df from the second select has only ["col2_plus_5"]
     # so the third expression remains pending again.
     assert df4.columns == [
-        "col2_plus_5"
+        "col2_plus_5",
     ], "After the second select, only 'col2_plus_5' remains."
     meta4 = df4.config_meta.get_metadata()
     still_pending = meta4.get("hopper_selects", [])
@@ -197,18 +181,18 @@ def test_multiple_selects_sequence():
     df6 = df5.hopper.apply_ready_selects()
     # Now the third expression can apply => new df => columns=["sum_col1_col3"]
     assert df6.columns == [
-        "sum_col1_col3"
+        "sum_col1_col3",
     ], "Final expression is applied, referencing col1 and col3."
     meta6 = df6.config_meta.get_metadata()
     assert len(meta6.get("hopper_selects", [])) == 0, "No pending selects remain."
 
 
 def test_selects_metadata_merge():
-    """
-    RQ10:
-      The plugin shall produce the resulting DataFrame containing only columns
-      from successfully applied select expressions, with updated 'hopper_selects'
-      metadata that removes the applied expressions.
+    """RQ10.
+
+    The plugin shall produce the resulting DataFrame containing only columns
+    from successfully applied select expressions, with updated 'hopper_selects'
+    metadata that removes the applied expressions.
     """
     df = pl.DataFrame({"alpha": [1, 2, 3], "beta": [10, 20, 30]})
     df.hopper.add_selects(

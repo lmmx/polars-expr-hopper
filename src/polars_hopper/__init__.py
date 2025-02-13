@@ -11,7 +11,6 @@ from typing import Literal, Union
 
 import polars as pl
 import polars_config_meta  # noqa: F401
-import pysnooper
 from polars.api import register_dataframe_namespace
 
 
@@ -140,7 +139,6 @@ class HopperPlugin:
         # Write updated metadata back
         self._df.config_meta.update(meta)
 
-    @pysnooper.snoop()
     def pop_expr_from_registry(self, expr: pl.Expr) -> bool:
         """Remove earliest row from 'hopper_expr_register' that matches given pl.Expr.
 

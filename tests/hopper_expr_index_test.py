@@ -4,8 +4,9 @@ import polars as pl
 
 
 def test_hopper_max_idx_initialization():
-    """Ensures the plugin sets hopper_max_idx to -1 if it is absent,
-    then increments it by the count of newly added expressions.
+    """Ensures the plugin sets hopper_max_idx to -1 if it is absent.
+
+    Then increments it by the count of newly added expressions.
     """
     df = pl.DataFrame({"col": [1, 2, 3]})
 
@@ -44,8 +45,9 @@ def test_hopper_max_idx_initialization():
 
 
 def test_hopper_max_idx_increments_existing():
-    """Verifies the plugin increments the existing hopper_max_idx
-    by the number of expressions added when the key is already present.
+    """Verifies hopper_max_idx increments by the number of expressions added.
+
+    (When the key is already present)
     """
     df = pl.DataFrame({"val": [10, 20]})
     df.config_meta.set(hopper_max_idx=5)  # Suppose we already have a value of 5

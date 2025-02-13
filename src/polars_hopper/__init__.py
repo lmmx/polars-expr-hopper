@@ -87,7 +87,7 @@ class HopperPlugin:
                     "expr": pl.String,
                     "applied": pl.Boolean,
                     "root_names": pl.List(pl.String),
-                }
+                },
             )
         )
         # Increment hopper_max_idx for each newly added expression
@@ -115,7 +115,7 @@ class HopperPlugin:
                         "root_names": pl.List(pl.String),
                     },
                 ),
-            ]
+            ],
         ).write_ndjson()
         meta["hopper_max_idx"] = post_idx
 

@@ -98,7 +98,7 @@ class HopperPlugin:
         post_idx = pre_idx + len(exprs)
         registrands = [
             {
-                "idx": expr_offset + pre_idx,
+                "idx": expr_offset + pre_idx + 1,
                 "kind": kind,
                 "expr": expr.meta.serialize(format="json"),
                 "applied": False,

@@ -39,6 +39,48 @@ class HopperPlugin:
         df.config_meta.update(meta)
 
     # -------------------------------------------------------------------------
+    # Expression registration
+    # -------------------------------------------------------------------------
+    def add_exprs(self, *exprs: pl.Expr, kind: Literal["f", "s", "a"]) -> None:
+        """Add one or more Polars expressions to the hopper.
+
+        Maintain a monotonically increasing `hopper_max_idx` as well.
+
+        Parameters
+        ----------
+        kind : {'f', 's', 'a'}
+            Specifies which list in metadata we update:
+            - 'f' => hopper_filters
+            - 's' => hopper_selects
+            - 'a' => hopper_addcols
+        exprs : pl.Expr
+            The actual Polars expressions to add.
+        """
+        meta = self._df.config_meta.get_metadata()
+
+        # Ensure the correct list in metadata
+        hopper_kind_meta_key = {
+            "f": "hopper_filters",
+            "s": "hopper_selects",
+            "a": "hopper_addcols",
+        }[kind]
+
+        # Append expressions to the chosen list
+        kind_exprs = meta.get(hopper_kind_meta_key, [])
+        kind_exprs.extend(exprs)
+        meta[hopper_kind_meta_key] = kind_exprs
+
+        # Initialize hopper_max_idx to -1 if not already present
+        pre_idx = meta.get("hopper_max_idx", -1)
+        # Increment hopper_max_idx for each newly added expression
+        post_idx = pre_idx + len(exprs)
+        new_exprs_idxs = range(pre_idx + 1, post_idx)
+        meta["hopper_max_idx"] = post_idx
+
+        # Write updated metadata back
+        self._df.config_meta.update(meta)
+
+    # -------------------------------------------------------------------------
     # Filter storage and application
     # -------------------------------------------------------------------------
     def add_filters(self, *exprs: pl.Expr) -> None:
@@ -48,11 +90,7 @@ class HopperPlugin:
         a boolean mask. They remain in the queue until the columns they need
         are present, at which point they are applied (and removed).
         """
-        meta = self._df.config_meta.get_metadata()
-        filters = meta.get("hopper_filters", [])
-        filters.extend(exprs)
-        meta["hopper_filters"] = filters
-        self._df.config_meta.update(meta)
+        self.add_exprs(*exprs, kind="f")
 
     def list_filters(self) -> list[pl.Expr]:
         """Return the list of pending Polars filter expressions."""
@@ -112,11 +150,7 @@ class HopperPlugin:
         typically yields a column transformation, or just a column reference
         (like `pl.col("foo").alias("bar")`).
         """
-        meta = self._df.config_meta.get_metadata()
-        selects = meta.get("hopper_selects", [])
-        selects.extend(exprs)
-        meta["hopper_selects"] = selects
-        self._df.config_meta.update(meta)
+        self.add_exprs(*exprs, kind="s")
 
     def list_selects(self) -> list[pl.Expr]:
         """Return the list of pending Polars select expressions."""
@@ -175,11 +209,7 @@ class HopperPlugin:
         typically yields a column addition or overwrite, or just a column reference
         (like `pl.col("foo").alias("bar")`).
         """
-        meta = self._df.config_meta.get_metadata()
-        addcols = meta.get("hopper_addcols", [])
-        addcols.extend(exprs)
-        meta["hopper_addcols"] = addcols
-        self._df.config_meta.update(meta)
+        self.add_exprs(*exprs, kind="a")
 
     def list_addcols(self) -> list[pl.Expr]:
         """Return the list of pending Polars with_columns expressions."""

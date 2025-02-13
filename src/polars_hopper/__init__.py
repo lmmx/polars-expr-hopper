@@ -69,6 +69,10 @@ class HopperPlugin:
         """Store the given DF in self._df.config_meta as NDJSON/JSON under 'hopper_expr_register'."""
         self._df.config_meta.update({hopper_reg_key: registry.write_json()})
 
+    def _refresh_expr_registry(self) -> None:
+        """Refresh the given DF in self._df.config_meta as NDJSON/JSON under 'hopper_expr_register'."""
+        self._write_expr_registry(self._read_expr_registry())
+
     def add_exprs(self, *exprs: pl.Expr, kind: Literal["f", "s", "a"]) -> None:
         """Add one or more Polars expressions to the hopper.
 
@@ -244,6 +248,10 @@ class HopperPlugin:
                 "No expression kinds specified. Provide at least one of 'f','s','a'.",
             )
 
+        registry = self._read_expr_registry()
+        if registry.is_empty():
+            return self._df
+
         # We'll apply them in the order the user specified
         new_df = self._df
         for kind in kinds:
@@ -268,10 +276,14 @@ class HopperPlugin:
                 if needed_cols <= avail_cols:
                     # Optionally pop from registry ONLY if 'kind' == 'f' (filters).
                     # Your existing tests expect that selects/addcols do not remove from the registry.
-                    if kind == "f" and hasattr(self, "pop_expr_from_registry"):
-                        removed = self.pop_expr_from_registry(expr)
-                        if not removed:
-                            raise ValueError(f"Inconsistent registry: {expr} not found")
+                    r0 = self._read_expr_registry()
+                    removed = self.pop_expr_from_registry(expr)
+                    r1 = self._read_expr_registry()
+                    assert (
+                        n_popped := len(r0) - len(r1)
+                    ) == 1, f"Registry popped {n_popped} items"
+                    if not removed:
+                        raise ValueError(f"Inconsistent registry: {expr} not found")
 
                     # Actually apply the expression
                     new_df = self._apply_expression(new_df, kind, expr)
@@ -288,8 +300,11 @@ class HopperPlugin:
 
             # If new_df is indeed a new object, also update that DF's metadata
             if changed_any and id(new_df) != id(self._df):
+                self._refresh_expr_registry()
                 meta_post = new_df.config_meta.get_metadata()
                 meta_post[meta_key] = still_pending
+                fresh_registry = self._df.config_meta.get_metadata()[hopper_reg_key]
+                meta_post[hopper_reg_key] = fresh_registry
                 new_df.config_meta.update(meta_post)
 
         return new_df

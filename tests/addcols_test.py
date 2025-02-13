@@ -64,6 +64,8 @@ def test_apply_ready_addcols_missing_cols():
         (pl.col("x") * 2).alias("x_times_2"),  # references 'x' -> valid now
         (pl.col("y") + 100).alias("y_plus_100"),  # references 'y' -> missing
     )
+    reg1 = df.hopper._read_expr_registry()
+    assert not reg1.is_empty(), "Registry was emptied"
 
     df2 = df.hopper.apply_ready_addcols()
     # The first expression applies, the second remains pending
@@ -75,8 +77,14 @@ def test_apply_ready_addcols_missing_cols():
     pending_exprs = meta2.get("hopper_addcols", [])
     assert len(pending_exprs) == 1, "One expression remains (references missing 'y')."
 
+    reg2 = df2.hopper._read_expr_registry()
+    assert not reg2.is_empty(), "Registry was emptied"
+    assert len(reg2) == len(pending_exprs), "Registry should contain only pending exprs"
+
     # Now we introduce 'y'
     df3 = df2.hopper.with_columns(pl.Series("y", [10, 20, 30]))
+    reg3 = df2.hopper._read_expr_registry()
+    assert not reg3.is_empty()
     df4 = df3.hopper.apply_ready_addcols()
     # That pending expression can now apply
     expected_cols = {"x", "x_times_2", "y", "y_plus_100"}

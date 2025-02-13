@@ -33,6 +33,8 @@ class HopperPlugin:
             meta["hopper_filters"] = []
         if "hopper_selects" not in meta:
             meta["hopper_selects"] = []
+        if "hopper_addcols" not in meta:
+            meta["hopper_addcols"] = []
 
         df.config_meta.update(meta)
 
@@ -74,7 +76,7 @@ class HopperPlugin:
         filtered_df = self._df
         applied_any = False
 
-        avail_cols = set(filtered_df.columns)
+        avail_cols = set(filtered_df.collect_schema())
 
         for expr in current_exprs:
             needed_cols = set(expr.meta.root_names())
@@ -83,7 +85,7 @@ class HopperPlugin:
                 filtered_df = filtered_df.hopper.filter(expr)
                 applied_any = True
                 # Update available columns if needed
-                avail_cols = set(filtered_df.columns)
+                avail_cols = set(filtered_df.collect_schema())
             else:
                 # Missing column => keep the expression for later
                 still_pending.append(expr)
@@ -142,7 +144,7 @@ class HopperPlugin:
 
         for expr in current_exprs:
             needed_cols = set(expr.meta.root_names())
-            avail_cols = set(selected_df.columns)
+            avail_cols = set(selected_df.collect_schema())
             if needed_cols <= avail_cols:
                 # We can apply this select
                 selected_df = selected_df.hopper.select(expr)
@@ -162,6 +164,69 @@ class HopperPlugin:
             selected_df.config_meta.update(meta_post)
 
         return selected_df
+
+    # -------------------------------------------------------------------------
+    # With columns storage and application
+    # -------------------------------------------------------------------------
+    def add_addcols(self, *exprs: pl.Expr) -> None:
+        """Add one or more Polars with_columns expressions to the hopper.
+
+        These expressions are used in `df.with_columns(expr)`. Each expression
+        typically yields a column addition or overwrite, or just a column reference
+        (like `pl.col("foo").alias("bar")`).
+        """
+        meta = self._df.config_meta.get_metadata()
+        addcols = meta.get("hopper_addcols", [])
+        addcols.extend(exprs)
+        meta["hopper_addcols"] = addcols
+        self._df.config_meta.update(meta)
+
+    def list_addcols(self) -> list[pl.Expr]:
+        """Return the list of pending Polars with_columns expressions."""
+        return self._df.config_meta.get_metadata().get("hopper_addcols", [])
+
+    def apply_ready_addcols(self) -> pl.DataFrame:
+        """Apply any stored with_columns expressions if columns exist.
+
+        We attempt each with_columns expression in turn. Because `df.with_columns(expr)`
+        adds the DataFrame columns, you should be aware that subsequent select expressions
+        apply to the new shape of the DataFrame.
+
+        If any required columns are missing, that expression remains pending.
+
+        Returns
+        -------
+        A new DataFrame with the successfully added/overwritten columns.
+
+        """
+        meta_pre = self._df.config_meta.get_metadata()
+        current_exprs = meta_pre.get("hopper_addcols", [])
+        still_pending = []
+        added_df = self._df
+        applied_any = False
+
+        for expr in current_exprs:
+            needed_cols = set(expr.meta.root_names())
+            avail_cols = set(added_df.collect_schema())
+            if needed_cols <= avail_cols:
+                # We can apply this with_columns
+                added_df = added_df.hopper.with_columns(expr)
+                applied_any = True
+            else:
+                # Missing columns => keep in the queue
+                still_pending.append(expr)
+
+        # Update old DF's metadata
+        meta_pre["hopper_addcols"] = still_pending
+        self._df.config_meta.update(meta_pre)
+
+        # If a new DataFrame was produced, update its metadata as well
+        if applied_any and id(added_df) != id(self._df):
+            meta_post = added_df.config_meta.get_metadata()
+            meta_post["hopper_addcols"] = still_pending
+            added_df.config_meta.update(meta_post)
+
+        return added_df
 
     # -------------------------------------------------------------------------
     # Serialization override when writing parquet

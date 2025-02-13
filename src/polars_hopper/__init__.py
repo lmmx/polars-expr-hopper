@@ -16,11 +16,13 @@ from polars.api import register_dataframe_namespace
 
 reg_schema = {
     "idx": pl.Int64,
-    "kind": pl.String,
-    "expr": pl.String,
-    "applied": pl.Boolean,
+    "kind": pl.String,  # 'f','s','a'
+    "expr": pl.String,  # JSON-serialized expression
+    "applied": pl.Boolean,  # whether we've successfully used it
     "root_names": pl.List(pl.String),
 }
+hopper_reg_key = "hopper_expr_register"
+hopper_idx_key = "hopper_max_idx"
 
 
 @register_dataframe_namespace("hopper")
@@ -50,6 +52,23 @@ class HopperPlugin:
     # -------------------------------------------------------------------------
     # Expression registration
     # -------------------------------------------------------------------------
+    def _read_expr_registry(self) -> pl.DataFrame:
+        """Parse the NDJSON or JSON registry from self._df.config_meta.
+
+        Return a Polars DataFrame with columns: idx, kind, expr, applied, root_names.
+        If none present, return an empty DF with the same schema.
+        """
+        meta = self._df.config_meta.get_metadata()
+        return (
+            pl.read_json(meta[hopper_reg_key].encode(), schema=reg_schema)
+            if hopper_reg_key in meta
+            else pl.DataFrame(schema=reg_schema)
+        )
+
+    def _write_expr_registry(self, registry: pl.DataFrame) -> None:
+        """Store the given DF in self._df.config_meta as NDJSON/JSON under 'hopper_expr_register'."""
+        self._df.config_meta.update({hopper_reg_key: registry.write_json()})
+
     def add_exprs(self, *exprs: pl.Expr, kind: Literal["f", "s", "a"]) -> None:
         """Add one or more Polars expressions to the hopper.
 
@@ -81,7 +100,6 @@ class HopperPlugin:
             "s": "hopper_selects",
             "a": "hopper_addcols",
         }[kind]
-        hopper_reg_meta_key = "hopper_expr_register"
 
         # Append expressions to the chosen list
         kind_exprs = meta.get(hopper_kind_meta_key, [])
@@ -89,12 +107,8 @@ class HopperPlugin:
         meta[hopper_kind_meta_key] = kind_exprs
 
         # Initialize hopper_max_idx to -1 if not already present
-        pre_idx = meta.get("hopper_max_idx", -1)
-        pre_reg = (
-            pl.read_json(meta[hopper_reg_meta_key].encode(), schema=reg_schema)
-            if hopper_reg_meta_key in meta
-            else pl.DataFrame(schema=reg_schema)
-        )
+        pre_idx = meta.get(hopper_idx_key, -1)
+        pre_reg = self._read_expr_registry()
         # Increment hopper_max_idx for each newly added expression
         post_idx = pre_idx + len(exprs)
         registrands = [
@@ -107,10 +121,11 @@ class HopperPlugin:
             }
             for expr_offset, expr in enumerate(exprs)
         ]
-        meta["hopper_expr_register"] = pl.concat(
+        registry = pl.concat(
             [pre_reg, pl.DataFrame(registrands, schema=reg_schema)],
-        ).write_json()
-        meta["hopper_max_idx"] = post_idx
+        )
+        self._write_expr_registry(registry)
+        meta[hopper_idx_key] = post_idx
 
         # Write updated metadata back
         self._df.config_meta.update(meta)
@@ -159,6 +174,126 @@ class HopperPlugin:
 
         return True
 
+    def _apply_expression(
+        self,
+        df: pl.DataFrame,
+        kind: str,
+        expr: pl.Expr,
+    ) -> pl.DataFrame:
+        """Apply the given expression to df depending on 'kind'.
+
+        'f' => df.filter(expr)
+        's' => df.select(expr)
+        'a' => df.with_columns(expr)
+        """
+        if kind == "f":
+            return df.filter(expr)
+        elif kind == "s":
+            return df.select(expr)
+        elif kind == "a":
+            return df.with_columns(expr)
+        else:
+            raise ValueError(f"Unknown expression kind '{kind}'")
+
+    def apply_ready_exprs(self, *kinds: Literal["f", "s", "a"]) -> pl.DataFrame:
+        """Apply any expressions of all kind(s), if the needed columns exist.
+
+          - Filters: we pop from the registry if the expression is successfully applied.
+          - Selects/Addcols: we do NOT remove from the registry (tests expect that logic).
+
+        Each expression is tried in turn:
+          - kind == 'f' => df.filter(expr)
+          - kind == 's' => df.select(expr)
+          - kind == 'a' => df.with_columns(expr)
+
+        If needed columns are missing, that expression remains pending. If we successfully
+        apply a filter expression (kind='f'), we call pop_expr_from_registry(expr).
+        The original code never used the registry for selects/addcols, so we skip it there.
+
+        Returns
+        -------
+        A new (possibly transformed) DataFrame. If it differs from self._df,
+        polars-config-meta merges metadata automatically.
+
+        """
+        return self.apply_ready_exprs_kinds("f", "s", "a")
+
+    def apply_ready_exprs_kinds(self, *kinds: Literal["f", "s", "a"]) -> pl.DataFrame:
+        """Apply any expressions of the specified kind(s), if the needed columns exist.
+
+          - Filters: we pop from the registry if the expression is successfully applied.
+          - Selects/Addcols: we do NOT remove from the registry (tests expect that logic).
+
+        Each expression is tried in turn:
+          - kind == 'f' => df.filter(expr)
+          - kind == 's' => df.select(expr)
+          - kind == 'a' => df.with_columns(expr)
+
+        If needed columns are missing, that expression remains pending. If we successfully
+        apply a filter expression (kind='f'), we call pop_expr_from_registry(expr).
+        The original code never used the registry for selects/addcols, so we skip it there.
+
+        Returns
+        -------
+        A new (possibly transformed) DataFrame. If it differs from self._df,
+        polars-config-meta merges metadata automatically.
+
+        """
+        if not kinds:
+            raise ValueError(
+                "No expression kinds specified. Provide at least one of 'f','s','a'.",
+            )
+
+        # We'll apply them in the order the user specified
+        new_df = self._df
+        for kind in kinds:
+            # Which metadata key do we read/write (hopper_filters, hopper_selects, or hopper_addcols)?
+            meta_key = {
+                "f": "hopper_filters",
+                "s": "hopper_selects",
+                "a": "hopper_addcols",
+            }[kind]
+
+            meta_pre = self._df.config_meta.get_metadata()
+            current_exprs = meta_pre.get(meta_key, [])
+
+            still_pending = []
+            changed_any = False
+
+            # We'll track available columns after each expression is applied
+            avail_cols = set(new_df.collect_schema())
+
+            for expr in current_exprs:
+                needed_cols = set(expr.meta.root_names())
+                if needed_cols <= avail_cols:
+                    # Optionally pop from registry ONLY if 'kind' == 'f' (filters).
+                    # Your existing tests expect that selects/addcols do not remove from the registry.
+                    if kind == "f" and hasattr(self, "pop_expr_from_registry"):
+                        removed = self.pop_expr_from_registry(expr)
+                        if not removed:
+                            raise ValueError(f"Inconsistent registry: {expr} not found")
+
+                    # Actually apply the expression
+                    new_df = self._apply_expression(new_df, kind, expr)
+                    changed_any = True
+                    # Update available columns in case columns changed
+                    avail_cols = set(new_df.collect_schema())
+                else:
+                    # Missing columns => keep it pending
+                    still_pending.append(expr)
+
+            # Update old DF's metadata list (filters/selects/addcols)
+            meta_pre[meta_key] = still_pending
+            self._df.config_meta.update(meta_pre)
+
+            # If new_df is indeed a new object, also update that DF's metadata
+            if changed_any and id(new_df) != id(self._df):
+                meta_post = new_df.config_meta.get_metadata()
+                meta_post[meta_key] = still_pending
+                new_df.config_meta.update(meta_post)
+
+        return new_df
+
     # -------------------------------------------------------------------------
     # Filter storage and application
     # -------------------------------------------------------------------------
@@ -187,41 +322,7 @@ class HopperPlugin:
         polars-config-meta merges metadata automatically.
 
         """
-        meta_pre = self._df.config_meta.get_metadata()
-        current_exprs = meta_pre.get("hopper_filters", [])
-        still_pending = []
-        filtered_df = self._df
-        applied_any = False
-
-        avail_cols = set(filtered_df.collect_schema())
-
-        for expr in current_exprs:
-            needed_cols = set(expr.meta.root_names())
-            if needed_cols <= avail_cols:
-                # TODO: make this impossible by making reg. source of truth for this op.
-                removed = self.pop_expr_from_registry(expr)
-                if not removed:
-                    raise ValueError(f"Inconsistent registry: {expr} not found")
-                # All needed columns exist; apply the filter
-                filtered_df = filtered_df.hopper.filter(expr)
-                applied_any = True
-                # Update available columns if needed
-                avail_cols = set(filtered_df.collect_schema())
-            else:
-                # Missing column => keep the expression for later
-                still_pending.append(expr)
-
-        # Update old DF's metadata
-        meta_pre["hopper_filters"] = still_pending
-        self._df.config_meta.update(meta_pre)
-
-        # If we actually created a new DataFrame, also update its metadata
-        if applied_any and id(filtered_df) != id(self._df):
-            meta_post = filtered_df.config_meta.get_metadata()
-            meta_post["hopper_filters"] = still_pending
-            filtered_df.config_meta.update(meta_post)
-
-        return filtered_df
+        return self.apply_ready_exprs_kinds("f")
 
     # -------------------------------------------------------------------------
     # Select storage and application
@@ -253,34 +354,7 @@ class HopperPlugin:
         A new DataFrame with the successfully selected/transformed columns.
 
         """
-        meta_pre = self._df.config_meta.get_metadata()
-        current_exprs = meta_pre.get("hopper_selects", [])
-        still_pending = []
-        selected_df = self._df
-        applied_any = False
-
-        for expr in current_exprs:
-            needed_cols = set(expr.meta.root_names())
-            avail_cols = set(selected_df.collect_schema())
-            if needed_cols <= avail_cols:
-                # We can apply this select
-                selected_df = selected_df.hopper.select(expr)
-                applied_any = True
-            else:
-                # Missing columns => keep in the queue
-                still_pending.append(expr)
-
-        # Update old DF's metadata
-        meta_pre["hopper_selects"] = still_pending
-        self._df.config_meta.update(meta_pre)
-
-        # If a new DataFrame was produced, update its metadata as well
-        if applied_any and id(selected_df) != id(self._df):
-            meta_post = selected_df.config_meta.get_metadata()
-            meta_post["hopper_selects"] = still_pending
-            selected_df.config_meta.update(meta_post)
-
-        return selected_df
+        return self.apply_ready_exprs_kinds("s")
 
     # -------------------------------------------------------------------------
     # With columns storage and application
@@ -312,34 +386,7 @@ class HopperPlugin:
         A new DataFrame with the successfully added/overwritten columns.
 
         """
-        meta_pre = self._df.config_meta.get_metadata()
-        current_exprs = meta_pre.get("hopper_addcols", [])
-        still_pending = []
-        added_df = self._df
-        applied_any = False
-
-        for expr in current_exprs:
-            needed_cols = set(expr.meta.root_names())
-            avail_cols = set(added_df.collect_schema())
-            if needed_cols <= avail_cols:
-                # We can apply this with_columns
-                added_df = added_df.hopper.with_columns(expr)
-                applied_any = True
-            else:
-                # Missing columns => keep in the queue
-                still_pending.append(expr)
-
-        # Update old DF's metadata
-        meta_pre["hopper_addcols"] = still_pending
-        self._df.config_meta.update(meta_pre)
-
-        # If a new DataFrame was produced, update its metadata as well
-        if applied_any and id(added_df) != id(self._df):
-            meta_post = added_df.config_meta.get_metadata()
-            meta_post["hopper_addcols"] = still_pending
-            added_df.config_meta.update(meta_post)
-
-        return added_df
+        return self.apply_ready_exprs_kinds("a")
 
     # -------------------------------------------------------------------------
     # Serialization override when writing parquet

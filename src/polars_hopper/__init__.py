@@ -44,7 +44,11 @@ class HopperPlugin:
     def add_exprs(self, *exprs: pl.Expr, kind: Literal["f", "s", "a"]) -> None:
         """Add one or more Polars expressions to the hopper.
 
-        Maintain a monotonically increasing `hopper_max_idx` as well.
+        We maintain a monotonically increasing `hopper_max_idx` and also serialise each
+        expression to JSON (using ``expr.meta.serialize(format="json")``) for
+        JSON-compatibility in expr registry metadata (stored in the
+        `hopper_expr_register` key).
+
 
         Parameters
         ----------

@@ -65,6 +65,7 @@ class HopperPlugin:
             "s": "hopper_selects",
             "a": "hopper_addcols",
         }[kind]
+        hopper_reg_meta_key = "hopper_expr_register"
 
         # Append expressions to the chosen list
         kind_exprs = meta.get(hopper_kind_meta_key, [])
@@ -73,10 +74,34 @@ class HopperPlugin:
 
         # Initialize hopper_max_idx to -1 if not already present
         pre_idx = meta.get("hopper_max_idx", -1)
+        pre_reg = (
+            pl.read_ndjson(meta[hopper_reg_meta_key].encode())
+            if hopper_reg_meta_key in meta
+            else pl.DataFrame(
+                schema={
+                    "idx": pl.Int64,
+                    "kind": pl.String,
+                    "expr": pl.String,
+                    "applied": pl.Boolean,
+                    "root_names": pl.List(pl.String),
+                }
+            )
+        )
         # Increment hopper_max_idx for each newly added expression
         post_idx = pre_idx + len(exprs)
-        # WIP
-        new_exprs_idxs = range(pre_idx + 1, post_idx)  # noqa
+        registrands = [
+            {
+                "idx": expr_offset + pre_idx,
+                "kind": kind,
+                "expr": expr.meta.serialize(format="json"),
+                "applied": False,
+                "root_names": expr.meta.root_names(),
+            }
+            for expr_offset, expr in enumerate(exprs)
+        ]
+        meta["hopper_expr_register"] = pl.concat(
+            [pre_reg, pl.DataFrame(registrands)]
+        ).write_ndjson()
         meta["hopper_max_idx"] = post_idx
 
         # Write updated metadata back

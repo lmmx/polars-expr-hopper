@@ -109,8 +109,8 @@ def test_expr_registry_creation_and_schema():
         "hopper_expr_register" in meta_after_add
     ), "Registry should be created upon first addition."
 
-    ndjson_str = meta_after_add["hopper_expr_register"]
-    reg_df = pl.read_ndjson(ndjson_str.encode())
+    json_str = meta_after_add["hopper_expr_register"]
+    reg_df = pl.read_json(json_str.encode())
 
     # Confirm the columns
     expected_cols = {"idx", "kind", "expr", "applied", "root_names"}
@@ -156,8 +156,8 @@ def test_expr_registry_multiple_additions_kinds_and_max_idx():
     ), "Max idx started at 5, plus 4 expressions => 9, plus 1 => 10."
 
     # Parse the registry
-    ndjson_str = meta["hopper_expr_register"]
-    reg_df = pl.read_ndjson(ndjson_str.encode())
+    json_str = meta["hopper_expr_register"]
+    reg_df = pl.read_json(json_str.encode())
     # We added 2 filter, 2 select, 1 addcols => total 5 new rows
     assert reg_df.shape == (5, 5), "We should have 5 total expressions in the registry."
 
@@ -197,8 +197,8 @@ def test_expr_registry_root_names_for_various_exprs():
     )
 
     meta = df.config_meta.get_metadata()
-    ndjson_str = meta["hopper_expr_register"]
-    reg_df = pl.read_ndjson(ndjson_str.encode())
+    json_str = meta["hopper_expr_register"]
+    reg_df = pl.read_json(json_str.encode())
     assert reg_df.shape == (4, 5), "We added 4 expressions total."
 
     # We'll map the 'expr' to the 'root_names' in the registry

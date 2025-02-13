@@ -14,6 +14,15 @@ import polars_config_meta  # noqa: F401
 from polars.api import register_dataframe_namespace
 
 
+reg_schema = {
+    "idx": pl.Int64,
+    "kind": pl.String,
+    "expr": pl.String,
+    "applied": pl.Boolean,
+    "root_names": pl.List(pl.String),
+}
+
+
 @register_dataframe_namespace("hopper")
 class HopperPlugin:
     """Hopper plugin for storing and applying Polars filter/select expressions.
@@ -82,17 +91,9 @@ class HopperPlugin:
         # Initialize hopper_max_idx to -1 if not already present
         pre_idx = meta.get("hopper_max_idx", -1)
         pre_reg = (
-            pl.read_ndjson(meta[hopper_reg_meta_key].encode())
+            pl.read_json(meta[hopper_reg_meta_key].encode(), schema=reg_schema)
             if hopper_reg_meta_key in meta
-            else pl.DataFrame(
-                schema={
-                    "idx": pl.Int64,
-                    "kind": pl.String,
-                    "expr": pl.String,
-                    "applied": pl.Boolean,
-                    "root_names": pl.List(pl.String),
-                },
-            )
+            else pl.DataFrame(schema=reg_schema)
         )
         # Increment hopper_max_idx for each newly added expression
         post_idx = pre_idx + len(exprs)
@@ -107,24 +108,55 @@ class HopperPlugin:
             for expr_offset, expr in enumerate(exprs)
         ]
         meta["hopper_expr_register"] = pl.concat(
-            [
-                pre_reg,
-                pl.DataFrame(
-                    registrands,
-                    schema={
-                        "idx": pl.Int64,
-                        "kind": pl.String,
-                        "expr": pl.String,
-                        "applied": pl.Boolean,
-                        "root_names": pl.List(pl.String),
-                    },
-                ),
-            ],
-        ).write_ndjson()
+            [pre_reg, pl.DataFrame(registrands, schema=reg_schema)],
+        ).write_json()
         meta["hopper_max_idx"] = post_idx
 
         # Write updated metadata back
         self._df.config_meta.update(meta)
+
+    def pop_expr_from_registry(self, expr: pl.Expr) -> bool:
+        """
+        Remove the earliest row from 'hopper_expr_register' that matches the given pl.Expr
+        by comparing JSON-serialised expressions.
+
+        Returns
+        -------
+        True if a matching row was found and removed; False if no match was found.
+        """
+        meta = self._df.config_meta.get_metadata()
+        hopper_reg_key = "hopper_expr_register"
+
+        if hopper_reg_key not in meta:
+            return False  # No registry at all => nothing to remove
+
+        # 1) Convert the JSON string back into a DataFrame
+        reg_json = meta[hopper_reg_key].encode()
+        registry_df = pl.read_json(reg_json, schema=reg_schema)
+
+        # 2) Serialize the incoming expr
+        serialized_expr = expr.meta.serialize(format="json")
+
+        # 3) Find all rows whose 'expr' matches, e.g. ignoring 'applied' or 'kind'
+        #    If you want to consider 'kind' or only rows where 'applied'==False,
+        #    you can refine this filter accordingly.
+        matching = registry_df.filter(pl.col("expr") == serialized_expr)
+
+        if matching.is_empty():
+            return False  # No match found => do nothing
+
+        # 4) Identify the earliest match by lowest idx
+        #    (If you prefer first added or first in insertion order, 'idx' is that.)
+        earliest_idx = matching["idx"].min()
+
+        # 5) Remove that row from the registry
+        updated_df = registry_df.filter(pl.col("idx") != earliest_idx)
+
+        # 6) Write the updated DF back to NDJSON
+        meta[hopper_reg_key] = updated_df.write_json()
+        self._df.config_meta.set(**meta)
+
+        return True
 
     # -------------------------------------------------------------------------
     # Filter storage and application
@@ -165,6 +197,10 @@ class HopperPlugin:
         for expr in current_exprs:
             needed_cols = set(expr.meta.root_names())
             if needed_cols <= avail_cols:
+                # TODO: make this impossible by making reg. source of truth for this op.
+                removed = self.pop_expr_from_registry(expr)
+                if not removed:
+                    raise ValueError(f"Inconsistent registry: {expr} not found")
                 # All needed columns exist; apply the filter
                 filtered_df = filtered_df.hopper.filter(expr)
                 applied_any = True

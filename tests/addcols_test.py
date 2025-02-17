@@ -14,16 +14,16 @@ def test_store_addcols():
     meta_before = df.config_meta.get_metadata()
 
     # Initially 'hopper_addcols' should be None or absent
-    assert (
-        meta_before.get("hopper_addcols") is None
-    ), "hopper_addcols should be unset before first use."
+    assert meta_before.get("hopper_addcols") is None, (
+        "hopper_addcols should be unset before first use."
+    )
 
     # Trigger the hopper plugin init
     df.hopper
     meta_mid = df.config_meta.get_metadata()
-    assert (
-        meta_mid.get("hopper_addcols") == []
-    ), "hopper_addcols should start as an empty list."
+    assert meta_mid.get("hopper_addcols") == [], (
+        "hopper_addcols should start as an empty list."
+    )
 
     # Add new addcols expressions
     df.hopper.add_addcols(pl.col("foo") * 10, pl.col("foo") + 5)
@@ -49,9 +49,9 @@ def test_apply_ready_addcols_when_all_cols_exist():
         "and the resulting DF gains the new columns."
     )
     meta2 = df2.config_meta.get_metadata()
-    assert (
-        meta2.get("hopper_addcols", []) == []
-    ), "No expressions remain pending after successful application."
+    assert meta2.get("hopper_addcols", []) == [], (
+        "No expressions remain pending after successful application."
+    )
 
 
 def test_apply_ready_addcols_missing_cols():
@@ -88,9 +88,9 @@ def test_apply_ready_addcols_missing_cols():
     df4 = df3.hopper.apply_ready_addcols()
     # That pending expression can now apply
     expected_cols = {"x", "x_times_2", "y", "y_plus_100"}
-    assert (
-        set(df4.collect_schema().keys()) == expected_cols
-    ), "All columns plus 'y_plus_100' after second expression applies."
+    assert set(df4.collect_schema().keys()) == expected_cols, (
+        "All columns plus 'y_plus_100' after second expression applies."
+    )
     assert not df4.config_meta.get_metadata().get(
         "hopper_addcols",
     ), "No pending addcols remain."
@@ -111,9 +111,9 @@ def test_preservation_addcols():
     df2 = df.hopper.with_columns((pl.col("bar") + 100).alias("bar_plus_100"))
     meta2 = df2.config_meta.get_metadata()
     pending_addcols = meta2.get("hopper_addcols", [])
-    assert (
-        len(pending_addcols) == 2
-    ), "All addcols expressions are preserved after with_columns() call."
+    assert len(pending_addcols) == 2, (
+        "All addcols expressions are preserved after with_columns() call."
+    )
 
     # Apply them now
     df3 = df2.hopper.apply_ready_addcols()
@@ -170,18 +170,18 @@ def test_multiple_addcols_sequence():
     expected_cols = {"a", "a_plus_1", "b", "b_times_2"}
     assert set(df4.collect_schema().keys()) == expected_cols, "Second addcols applied."
     meta4 = df4.config_meta.get_metadata()
-    assert (
-        len(meta4.get("hopper_addcols", [])) == 1
-    ), "Still one expression referencing 'c' pending."
+    assert len(meta4.get("hopper_addcols", [])) == 1, (
+        "Still one expression referencing 'c' pending."
+    )
 
     # Finally, introduce 'c'
     df5 = df4.hopper.with_columns(pl.Series("c", [100, 200, 300]))
     df6 = df5.hopper.apply_ready_addcols()
     # (3) can now apply => adds "a_plus_c"
     all_expected = {"a", "a_plus_1", "b", "b_times_2", "c", "a_plus_c"}
-    assert (
-        set(df6.collect_schema().keys()) == all_expected
-    ), "All addcols eventually applied."
+    assert set(df6.collect_schema().keys()) == all_expected, (
+        "All addcols eventually applied."
+    )
     assert not df6.config_meta.get_metadata().get(
         "hopper_addcols",
     ), "No pending expressions remain."

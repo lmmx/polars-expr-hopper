@@ -60,9 +60,9 @@ def test_apply_ready_selects_complete():
     ], "Only 'x' should be present after the first successful select."
     meta_after = df_selected.config_meta.get_metadata()
     still_pending = meta_after.get("hopper_selects", [])
-    assert (
-        len(still_pending) == 1
-    ), "The second select expression referencing 'y' should remain pending."
+    assert len(still_pending) == 1, (
+        "The second select expression referencing 'y' should remain pending."
+    )
 
 
 def test_apply_ready_selects_with_missing_cols():
@@ -95,9 +95,9 @@ def test_apply_ready_selects_with_missing_cols():
     assert df4.columns == ["b"], "After successful second select, only 'b' remains."
 
     meta4 = df4.config_meta.get_metadata()
-    assert (
-        len(meta4.get("hopper_selects", [])) == 0
-    ), "No pending selects remain after success."
+    assert len(meta4.get("hopper_selects", [])) == 0, (
+        "No pending selects remain after success."
+    )
 
 
 def test_preservation_selects():
@@ -115,16 +115,16 @@ def test_preservation_selects():
     meta2 = df2.config_meta.get_metadata()
     # The original 'hopper_selects' should still be present
     stored_selects = meta2.get("hopper_selects", [])
-    assert (
-        len(stored_selects) == 2
-    ), "Select expressions are preserved across transformations."
+    assert len(stored_selects) == 2, (
+        "Select expressions are preserved across transformations."
+    )
 
     # Now apply them
     df3 = df2.hopper.apply_ready_selects()
     assert df3.columns == ["u"], "After applying the first select, only 'u' remains."
-    assert (
-        len(df3.config_meta.get_metadata().get("hopper_selects", [])) == 1
-    ), "One select expression should remain if 'v' is lost after the first select."
+    assert len(df3.config_meta.get_metadata().get("hopper_selects", [])) == 1, (
+        "One select expression should remain if 'v' is lost after the first select."
+    )
 
 
 def test_multiple_selects_sequence():
@@ -169,9 +169,9 @@ def test_multiple_selects_sequence():
     ], "After the second select, only 'col2_plus_5' remains."
     meta4 = df4.config_meta.get_metadata()
     still_pending = meta4.get("hopper_selects", [])
-    assert (
-        len(still_pending) == 1
-    ), "The third expression referencing 'col1' & 'col3' is still pending."
+    assert len(still_pending) == 1, (
+        "The third expression referencing 'col1' & 'col3' is still pending."
+    )
 
     # Finally, let's re-introduce 'col1' & 'col3'
     df5 = df4.hopper.with_columns(
@@ -208,9 +208,9 @@ def test_selects_metadata_merge():
     assert df2.columns == ["alpha_x10"]
     meta2 = df2.config_meta.get_metadata()
     pending_after_first = meta2.get("hopper_selects", [])
-    assert (
-        len(pending_after_first) == 1
-    ), "The second expression referencing 'beta' remains."
+    assert len(pending_after_first) == 1, (
+        "The second expression referencing 'beta' remains."
+    )
 
     # Introduce 'beta' again
     df3 = df2.hopper.with_columns(pl.Series("beta", [10, 20, 30]))
@@ -219,6 +219,6 @@ def test_selects_metadata_merge():
     # The new DataFrame has only "beta_plus1"
     assert df4.columns == ["beta_plus1"]
     meta4 = df4.config_meta.get_metadata()
-    assert (
-        len(meta4.get("hopper_selects", [])) == 0
-    ), "All select expressions are applied, none remain."
+    assert len(meta4.get("hopper_selects", [])) == 0, (
+        "All select expressions are applied, none remain."
+    )

@@ -292,9 +292,9 @@ class HopperPlugin:
                         print(f"Popped {expr}")
                     assert removed, f"Expr {expr} was not popped from registry"
                     r1 = self._read_expr_registry()
-                    assert (
-                        n_popped := len(r0) - len(r1)
-                    ) == 1, f"Registry popped {n_popped} items"
+                    assert (n_popped := len(r0) - len(r1)) == 1, (
+                        f"Registry popped {n_popped} items"
+                    )
                     if not removed:
                         raise ValueError(f"Inconsistent registry: {expr} not found")
 

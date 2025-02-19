@@ -12,18 +12,18 @@ def test_hopper_max_idx_initialization():
 
     # Check that 'hopper_max_idx' is unset initially
     meta = df.config_meta.get_metadata()
-    assert (
-        "hopper_max_idx" not in meta
-    ), "Expected hopper_max_idx not to exist before plugin init."
+    assert "hopper_max_idx" not in meta, (
+        "Expected hopper_max_idx not to exist before plugin init."
+    )
 
     # Trigger plugin init
     df.hopper
     meta_post_init = df.config_meta.get_metadata()
     # Our code sets hopper_max_idx to -1 only when we actually add exprs,
     # so if the plugin doesn't set it on init, we confirm it is still absent or unchanged.
-    assert (
-        "hopper_max_idx" not in meta_post_init
-    ), "hopper_max_idx is set only on first add_exprs call."
+    assert "hopper_max_idx" not in meta_post_init, (
+        "hopper_max_idx is set only on first add_exprs call."
+    )
 
     # Now add 2 expressions
     df.hopper.add_filters(pl.col("col") > 1, pl.col("col") < 3)
@@ -31,17 +31,17 @@ def test_hopper_max_idx_initialization():
 
     # The code sets hopper_max_idx = -1 if not present, then increments by len(exprs).
     #  -> started at -1, plus 2 => final is 1
-    assert (
-        meta_after_add["hopper_max_idx"] == 1
-    ), "hopper_max_idx should start at -1, then increment by 2 to 1."
+    assert meta_after_add["hopper_max_idx"] == 1, (
+        "hopper_max_idx should start at -1, then increment by 2 to 1."
+    )
 
     # Add 1 more expression
     df.hopper.add_selects(pl.col("col") * 2)
     meta_after_second_add = df.config_meta.get_metadata()
     # hopper_max_idx was 1, plus 1 new expression => becomes 2
-    assert (
-        meta_after_second_add["hopper_max_idx"] == 2
-    ), "hopper_max_idx should now be 2 after adding one more expression."
+    assert meta_after_second_add["hopper_max_idx"] == 2, (
+        "hopper_max_idx should now be 2 after adding one more expression."
+    )
 
 
 def test_hopper_max_idx_increments_existing():
@@ -55,9 +55,9 @@ def test_hopper_max_idx_increments_existing():
     # Confirm the plugin doesn't overwrite this key on init
     df.hopper
     meta_init = df.config_meta.get_metadata()
-    assert (
-        meta_init["hopper_max_idx"] == 5
-    ), "The plugin shall preserve the existing hopper_max_idx."
+    assert meta_init["hopper_max_idx"] == 5, (
+        "The plugin shall preserve the existing hopper_max_idx."
+    )
 
     # Add 3 expressions
     df.hopper.add_addcols(
@@ -68,18 +68,18 @@ def test_hopper_max_idx_increments_existing():
     meta_after_add = df.config_meta.get_metadata()
 
     # The old value was 5, plus 3 expressions => 8
-    assert (
-        meta_after_add["hopper_max_idx"] == 8
-    ), "hopper_max_idx should increase from 5 to 8 after adding 3 expressions."
+    assert meta_after_add["hopper_max_idx"] == 8, (
+        "hopper_max_idx should increase from 5 to 8 after adding 3 expressions."
+    )
 
     # Add 2 more expressions of any kind
     df.hopper.add_filters(pl.col("val") > 15, pl.col("val") < 25)
     meta_after_more = df.config_meta.get_metadata()
 
     # The old value was 8, plus 2 expressions => 10
-    assert (
-        meta_after_more["hopper_max_idx"] == 10
-    ), "hopper_max_idx should now be 10 after adding 2 more expressions."
+    assert meta_after_more["hopper_max_idx"] == 10, (
+        "hopper_max_idx should now be 10 after adding 2 more expressions."
+    )
 
 
 def test_expr_registry_creation_and_schema():
@@ -90,45 +90,45 @@ def test_expr_registry_creation_and_schema():
     df = pl.DataFrame({"num": [1, 2, 3]})
     meta_before = df.config_meta.get_metadata()
     # Confirm that 'hopper_expr_register' is not present at the start
-    assert (
-        "hopper_expr_register" not in meta_before
-    ), "Registry should not exist initially."
+    assert "hopper_expr_register" not in meta_before, (
+        "Registry should not exist initially."
+    )
 
     df.hopper
     meta_mid = df.config_meta.get_metadata()
     # Confirm that we still do not have 'hopper_expr_register' until we add exprs
-    assert (
-        "hopper_expr_register" not in meta_mid
-    ), "No register until expressions are actually added."
+    assert "hopper_expr_register" not in meta_mid, (
+        "No register until expressions are actually added."
+    )
 
     # Add a single filter expression
     df.hopper.add_filters(pl.col("num") > 1)
     meta_after_add = df.config_meta.get_metadata()
     # Now 'hopper_expr_register' must exist
-    assert (
-        "hopper_expr_register" in meta_after_add
-    ), "Registry should be created upon first addition."
+    assert "hopper_expr_register" in meta_after_add, (
+        "Registry should be created upon first addition."
+    )
 
     json_str = meta_after_add["hopper_expr_register"]
     reg_df = pl.read_json(json_str.encode())
 
     # Confirm the columns
     expected_cols = {"idx", "kind", "expr", "applied", "root_names"}
-    assert (
-        set(reg_df.columns) == expected_cols
-    ), "Registry must have the correct schema columns."
+    assert set(reg_df.columns) == expected_cols, (
+        "Registry must have the correct schema columns."
+    )
     # We have exactly 1 row
     assert reg_df.shape == (1, 5)
     row = reg_df.to_dicts()[0]
-    assert (
-        row["idx"] == 0
-    ), "First expression should have idx=0 (hopper_max_idx started at -1)."
+    assert row["idx"] == 0, (
+        "First expression should have idx=0 (hopper_max_idx started at -1)."
+    )
     assert row["kind"] == "f", "We added a filter, so kind should be 'f'."
     assert not row["applied"], "Newly added expressions are not yet applied."
     # 'expr' is the JSON-serialized expression string
-    assert (
-        isinstance(row["expr"], str) and row["expr"]
-    ), "Must store expression as a nonempty JSON string."
+    assert isinstance(row["expr"], str) and row["expr"], (
+        "Must store expression as a nonempty JSON string."
+    )
     # 'root_names' must reflect the columns the expression references
     assert row["root_names"] == ["num"], "Should detect the 'num' column as root name."
 
@@ -151,9 +151,9 @@ def test_expr_registry_multiple_additions_kinds_and_max_idx():
     df.hopper.add_addcols((pl.col("bar") + 1).alias("bar_plus_1"))  # idx=10
 
     meta = df.config_meta.get_metadata()
-    assert (
-        meta["hopper_max_idx"] == 10
-    ), "Max idx started at 5, plus 4 expressions => 9, plus 1 => 10."
+    assert meta["hopper_max_idx"] == 10, (
+        "Max idx started at 5, plus 4 expressions => 9, plus 1 => 10."
+    )
 
     # Parse the registry
     json_str = meta["hopper_expr_register"]
@@ -232,6 +232,6 @@ def test_expr_registry_root_names_for_various_exprs():
 
     # Also confirm all are still not applied
     for r in data_rows:
-        assert not r[
-            "applied"
-        ], "No expressions have been applied yet, so 'applied' is false."
+        assert not r["applied"], (
+            "No expressions have been applied yet, so 'applied' is false."
+        )

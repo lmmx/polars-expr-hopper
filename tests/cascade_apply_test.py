@@ -53,6 +53,6 @@ def test_cascade_addcols_and_filter():
     # Check that the plugin’s registry is empty or at least that the *filter* is removed,
     # depending on how you handle addcols (some code removes them once applied; some code does not).
     reg2 = df2.hopper._read_expr_registry()
-    assert (
-        reg2.shape[0] == 0
-    ), f"Registry should be empty after successful cascade.\n{reg2}"
+    assert reg2.shape[0] == 0, (
+        f"Registry should be empty after successful cascade.\n{reg2}"
+    )

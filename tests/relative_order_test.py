@@ -84,8 +84,8 @@ def test_order_dependency_bug():
     # Here's an optional test to confirm the registry is empty (or at least
     # the same) in both scenarios:
     # -------------------------------------------------------------------------
-    assert (
-        regA2.shape == regB2.shape
-    ), f"Registry mismatch depending on order:\nA: {regA2}\nB: {regB2}"
+    assert regA2.shape == regB2.shape, (
+        f"Registry mismatch depending on order:\nA: {regA2}\nB: {regB2}"
+    )
     # If your plugin is truly fixed, they should both be empty or same shape.
     # If the bug persists, you'll see a test failure indicating a difference.

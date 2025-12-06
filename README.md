@@ -8,11 +8,36 @@
 [![License](https://img.shields.io/pypi/l/polars-expr-hopper.svg)](https://pypi.org/project/polars-expr-hopper)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/lmmx/polars-expr-hopper/master.svg)](https://results.pre-commit.ci/latest/github/lmmx/polars-expr-hopper/master)
 
-**Polars plugin providing an “expression hopper”**—a flexible, DataFrame-level container of **Polars expressions** (`pl.Expr`) that apply themselves **as soon as** the relevant columns are available.
+**Declarative, schema-aware expression application for Polars**
+
+Define your filters and transformations upfront, and let them apply automatically as soon as the columns they need exist. No more manually checking schemas or ordering your pipeline steps: just declare what you want, and the hopper handles the timing.
 
 Powered by [polars-config-meta](https://pypi.org/project/polars-config-meta/) for persistent DataFrame-level metadata.
 
 Simplify data pipelines by storing your expressions in a single location and letting them apply **as soon as** the corresponding columns exist in the DataFrame schema.
+
+## Why use this?
+
+Imagine you're building a data pipeline where:
+
+- You want to filter rows early to minimise downstream processing
+- But the columns you need to filter on don't exist yet: they're created mid-pipeline
+- You don't want to scatter filter logic throughout your code or manually track "when can I apply this?"
+
+**polars-expr-hopper** lets you declare all your expressions upfront. They sit in a "hopper" and apply themselves the moment their required columns appear in the DataFrame schema.
+
+### Real-world example: CLI tools
+
+This pattern shines when building CLI tools where users specify filters via arguments. Instead of complex logic to determine *when* each filter can run, you just:
+
+1. Parse all user-provided filters into Polars expressions
+2. Add them to the hopper
+3. Call `apply_ready_filters()` after each pipeline stage
+
+Filters automatically apply as soon as possible, minimising the rows flowing through expensive operations (like API calls or joins).
+
+See [octopolars](https://github.com/lmmx/octopolars) for a real implementation using this pattern,
+specifically [the `apply_ready_exprs()` call](https://github.com/lmmx/octopolars/blob/aeddb7279a9b872224a5bb490612aa9b241202d1/src/octopols/inventory.py#L124).
 
 ## Installation
 

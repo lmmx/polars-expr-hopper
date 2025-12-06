@@ -103,6 +103,17 @@ df = df.hopper.apply_ready_filters()
 
 ### How It Works
 
+In brief:
+
+1. **Add expressions** to the hopper via `df.hopper.add_filters()`, `add_selects()`, or `add_addcols()`
+2. **Expressions wait** until their required columns (detected via `.meta.root_names()`) exist in the DataFrame
+3. **Call `apply_ready_*()`** after pipeline stages ⇢ ready expressions apply and remove themselves
+4. **Metadata travels** with the DataFrame through transformations (powered by [polars-config-meta](https://pypi.org/project/polars-config-meta/))
+
+This enables a "declare once, apply when ready" pattern that simplifies complex pipelines.
+
+#### Implementation details
+
 Internally, **polars-expr-hopper** attaches a small “manager” object (a plugin namespace) to each `DataFrame`. This manager leverages [polars-config-meta](https://pypi.org/project/polars-config-meta/) to store data in `df.config_meta.get_metadata()`, keyed by the `id(df)`.
 
 1. **List of In-Memory Expressions**:

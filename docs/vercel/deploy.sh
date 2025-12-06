@@ -25,7 +25,7 @@ python --version
 #    - First pin urllib3<2 (to avoid known breakage).
 #    - Then install your docs extra so that mkdocs & related are available.
 uv pip install "urllib3<2"
-uv sync --only-group docs
+uv sync --group docs
 
 # 8) Optionally run mkdocs here if you need it immediately in “deploy”
 #    (e.g., if your older script used ‘pdm run mkdocs’ at this point).

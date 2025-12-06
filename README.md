@@ -8,11 +8,36 @@
 [![License](https://img.shields.io/pypi/l/polars-expr-hopper.svg)](https://pypi.org/project/polars-expr-hopper)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/lmmx/polars-expr-hopper/master.svg)](https://results.pre-commit.ci/latest/github/lmmx/polars-expr-hopper/master)
 
-**Polars plugin providing an “expression hopper”**—a flexible, DataFrame-level container of **Polars expressions** (`pl.Expr`) that apply themselves **as soon as** the relevant columns are available.
+**Declarative, schema-aware expression application for Polars**
+
+Define your filters and transformations upfront, and let them apply automatically as soon as the columns they need exist. No more manually checking schemas or ordering your pipeline steps: just declare what you want, and the hopper handles the timing.
 
 Powered by [polars-config-meta](https://pypi.org/project/polars-config-meta/) for persistent DataFrame-level metadata.
 
 Simplify data pipelines by storing your expressions in a single location and letting them apply **as soon as** the corresponding columns exist in the DataFrame schema.
+
+## Why use this?
+
+Imagine you're building a data pipeline where:
+
+- You want to filter rows early to minimise downstream processing
+- But the columns you need to filter on don't exist yet: they're created mid-pipeline
+- You don't want to scatter filter logic throughout your code or manually track "when can I apply this?"
+
+**polars-expr-hopper** lets you declare all your expressions upfront. They sit in a "hopper" and apply themselves the moment their required columns appear in the DataFrame schema.
+
+### Real-world example: CLI tools
+
+This pattern shines when building CLI tools where users specify filters via arguments. Instead of complex logic to determine *when* each filter can run, you just:
+
+1. Parse all user-provided filters into Polars expressions
+2. Add them to the hopper
+3. Call `apply_ready_filters()` after each pipeline stage
+
+Filters automatically apply as soon as possible, minimising the rows flowing through expensive operations (like API calls or joins).
+
+See [octopolars](https://github.com/lmmx/octopolars) for a real implementation using this pattern,
+specifically [the `apply_ready_exprs()` call](https://github.com/lmmx/octopolars/blob/aeddb7279a9b872224a5bb490612aa9b241202d1/src/octopols/inventory.py#L124).
 
 ## Installation
 
@@ -48,36 +73,32 @@ pip install polars-expr-hopper
 
 ```python
 import polars as pl
-import polars_hopper  # This registers the .hopper plugin under pl.DataFrame
+import polars_hopper  # Registers the .hopper namespace
 
-# Create an initial DataFrame
+# Suppose we're building a pipeline that:
+# 1. Starts with user data
+# 2. Later enriches it with age information from another source
+# 3. We want to filter out user_id=0 immediately, and filter by age>18 as soon as age exists
+
 df = pl.DataFrame({
     "user_id": [1, 2, 3, 0],
     "name": ["Alice", "Bob", "Charlie", "NullUser"]
 })
 
-# Add expressions to the hopper:
-#  - This one is valid right away: pl.col("user_id") != 0
-#  - Another needs a future 'age' column
+# Declare BOTH filters upfront, even though 'age' doesn't exist yet
 df.hopper.add_filters(pl.col("user_id") != 0)
-df.hopper.add_filters(pl.col("age") > 18)  # 'age' doesn't exist yet
+df.hopper.add_filters(pl.col("age") > 18)  # 'age' column doesn't exist yet!
 
-# Apply what we can; the first expression is immediately valid:
+# Apply what we can now (only the user_id filter runs)
 df = df.hopper.apply_ready_filters()
-print(df)
-# Rows with user_id=0 are dropped.
+# NullUser row is gone, age filter stays pending
 
-# Now let's do a transformation that adds an 'age' column.
-# By calling df.hopper.with_columns(...), the plugin
-# automatically copies the hopper metadata to the new DataFrame.
-df2 = df.hopper.with_columns(
-    pl.Series("age", [25, 15, 30])  # new column
-)
+# Later in the pipeline: enrich with age data
+df = df.hopper.with_columns(pl.Series("age", [25, 15, 30]))
 
-# Now the second expression can be applied:
-df2 = df2.hopper.apply_ready_filters()
-print(df2)
-# Only rows with age > 18 remain. That expression is then removed from the hopper.
+# Now the age filter can apply
+df = df.hopper.apply_ready_filters()
+# Only rows with age > 18 remain, and that expr is removed from the hopper
 ```
 
 ### How It Works

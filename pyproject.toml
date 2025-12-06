@@ -1,8 +1,6 @@
 [build-system]
 build-backend = "pdm.backend"
-requires = [
-  "pdm-backend"
-]
+requires = ["pdm-backend"]
 
 [dependency-groups]
 dev = [

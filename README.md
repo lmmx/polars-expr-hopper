@@ -73,36 +73,32 @@ pip install polars-expr-hopper
 
 ```python
 import polars as pl
-import polars_hopper  # This registers the .hopper plugin under pl.DataFrame
+import polars_hopper  # Registers the .hopper namespace
 
-# Create an initial DataFrame
+# Suppose we're building a pipeline that:
+# 1. Starts with user data
+# 2. Later enriches it with age information from another source
+# 3. We want to filter out user_id=0 immediately, and filter by age>18 as soon as age exists
+
 df = pl.DataFrame({
     "user_id": [1, 2, 3, 0],
     "name": ["Alice", "Bob", "Charlie", "NullUser"]
 })
 
-# Add expressions to the hopper:
-#  - This one is valid right away: pl.col("user_id") != 0
-#  - Another needs a future 'age' column
+# Declare BOTH filters upfront, even though 'age' doesn't exist yet
 df.hopper.add_filters(pl.col("user_id") != 0)
-df.hopper.add_filters(pl.col("age") > 18)  # 'age' doesn't exist yet
+df.hopper.add_filters(pl.col("age") > 18)  # 'age' column doesn't exist yet!
 
-# Apply what we can; the first expression is immediately valid:
+# Apply what we can now (only the user_id filter runs)
 df = df.hopper.apply_ready_filters()
-print(df)
-# Rows with user_id=0 are dropped.
+# NullUser row is gone, age filter stays pending
 
-# Now let's do a transformation that adds an 'age' column.
-# By calling df.hopper.with_columns(...), the plugin
-# automatically copies the hopper metadata to the new DataFrame.
-df2 = df.hopper.with_columns(
-    pl.Series("age", [25, 15, 30])  # new column
-)
+# Later in the pipeline: enrich with age data
+df = df.hopper.with_columns(pl.Series("age", [25, 15, 30]))
 
-# Now the second expression can be applied:
-df2 = df2.hopper.apply_ready_filters()
-print(df2)
-# Only rows with age > 18 remain. That expression is then removed from the hopper.
+# Now the age filter can apply
+df = df.hopper.apply_ready_filters()
+# Only rows with age > 18 remain, and that expr is removed from the hopper
 ```
 
 ### How It Works

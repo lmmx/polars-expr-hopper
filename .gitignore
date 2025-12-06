@@ -11,3 +11,5 @@ wheels/
 
 *.swp
 .cache/
+
+site/

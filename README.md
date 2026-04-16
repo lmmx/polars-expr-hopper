@@ -2,7 +2,6 @@
 
 <!-- [![downloads](https://static.pepy.tech/badge/polars-expr-hopper/month)](https://pepy.tech/project/polars-expr-hopper) -->
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
-[![pdm-managed](https://img.shields.io/badge/pdm-managed-blueviolet)](https://pdm.fming.dev)
 [![PyPI](https://img.shields.io/pypi/v/polars-expr-hopper.svg)](https://pypi.org/project/polars-expr-hopper)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/polars-expr-hopper.svg)](https://pypi.org/project/polars-expr-hopper)
 [![License](https://img.shields.io/pypi/l/polars-expr-hopper.svg)](https://pypi.org/project/polars-expr-hopper)

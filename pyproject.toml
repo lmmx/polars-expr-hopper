@@ -25,7 +25,7 @@ name = "polars-expr-hopper"
 version = "1.1.1"
 description = "A Polars plugin providing a 'hopper' of expressions for automatic, schema-aware application."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = [
   "polars",
   "plugin",
@@ -46,11 +46,11 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13"
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14"
 ]
 dependencies = [
   "polars-config-meta>=0.1.3"

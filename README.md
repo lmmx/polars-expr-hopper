@@ -79,10 +79,9 @@ import polars_hopper  # Registers the .hopper namespace
 # 2. Later enriches it with age information from another source
 # 3. We want to filter out user_id=0 immediately, and filter by age>18 as soon as age exists
 
-df = pl.DataFrame({
-    "user_id": [1, 2, 3, 0],
-    "name": ["Alice", "Bob", "Charlie", "NullUser"]
-})
+df = pl.DataFrame(
+    {"user_id": [1, 2, 3, 0], "name": ["Alice", "Bob", "Charlie", "NullUser"]}
+)
 
 # Declare BOTH filters upfront, even though 'age' doesn't exist yet
 df.hopper.add_filters(pl.col("user_id") != 0)

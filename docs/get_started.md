@@ -34,10 +34,12 @@ import polars as pl
 import polars_expr_hopper  # registers .hopper plugin
 
 # Create an initial DataFrame
-df = pl.DataFrame({
-    "user_id": [1, 2, 3, 0],
-    "name": ["Alice", "Bob", "Charlie", "NullUser"],
-})
+df = pl.DataFrame(
+    {
+        "user_id": [1, 2, 3, 0],
+        "name": ["Alice", "Bob", "Charlie", "NullUser"],
+    }
+)
 
 # Add an expression referencing 'user_id'
 df.hopper.add_filters(pl.col("user_id") != 0)

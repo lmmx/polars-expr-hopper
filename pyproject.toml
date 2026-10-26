@@ -33,9 +33,9 @@ keywords = [
   "expr",
   "metadata"
 ]
-license = {text = "MIT"}
+license = { text = "MIT" }
 authors = [
-  {name = "Louis Maddox", email = "louismmx@gmail.com"}
+  { name = "Louis Maddox", email = "louismmx@gmail.com" }
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
